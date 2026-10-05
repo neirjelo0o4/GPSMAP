@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>E-Bike Navigation Pro</title>
+    <title>E-Bike Nav Pro - Accurate & Alternate Routes</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
@@ -11,195 +11,187 @@
     
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', Roboto, Arial, sans-serif; }
-        body { margin: 0; padding: 0; overflow: hidden; background: #000; color: #333; }
+        body { margin: 0; padding: 0; overflow: hidden; background: #111; color: #333; }
         
         #map { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; }
         .leaflet-routing-container { display: none !important; }
         
-        /* SETUP MODE UI */
-        .setup-top-panel { position: absolute; top: 20px; left: 5%; width: 90%; z-index: 1000; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); padding: 10px; transition: 0.4s; }
-        .setup-top-panel.hidden { transform: translateY(-150%); opacity: 0; pointer-events: none; }
-        
-        .input-row { display: flex; align-items: center; padding: 12px 10px; border-bottom: 1px solid #f1f3f4; }
+        /* SEARCH PANEL */
+        .search-panel { position: absolute; top: 20px; left: 5%; width: 90%; max-width: 400px; z-index: 1000; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); padding: 10px; transition: 0.3s; }
+        .search-panel.hidden { transform: translateY(-150%); opacity: 0; pointer-events: none; }
+        .input-row { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #eee; }
         .input-row:last-child { border-bottom: none; }
-        .input-row .dot { width: 10px; height: 10px; border-radius: 50%; border: 3px solid #1a73e8; margin-right: 20px; margin-left: 5px; }
-        .input-row .pin { color: #ea4335; font-size: 22px; margin-right: 15px; }
-        .input-row input { border: none; font-size: 16px; outline: none; width: 100%; color: #3c4043; background: transparent; }
+        .input-row i { color: #1a73e8; margin-right: 15px; }
+        .input-row input { border: none; font-size: 16px; outline: none; width: 100%; }
         
-        .suggestions-container { position: absolute; top: 100%; left: 0; width: 100%; background: white; border-radius: 0 0 12px 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-height: 250px; overflow-y: auto; z-index: 1001; display: none; }
+        .suggestions { position: absolute; top: 100%; left: 0; width: 100%; background: white; border-radius: 0 0 12px 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-height: 250px; overflow-y: auto; z-index: 1001; display: none; }
         .suggestion-item { padding: 12px 20px; display: flex; align-items: center; border-bottom: 1px solid #f1f3f4; cursor: pointer; }
         .suggestion-item:hover { background: #f8f9fa; }
-        .suggestion-item i { margin-right: 15px; color: #70757a; }
         
-        .setup-bottom-panel { position: absolute; bottom: 0; left: 0; width: 100%; background: white; border-radius: 20px 20px 0 0; padding: 20px 15px; z-index: 1000; box-shadow: 0 -4px 15px rgba(0,0,0,0.1); transition: 0.4s; }
-        .setup-bottom-panel.hidden { transform: translateY(100%); }
-        .route-info-preview { font-size: 24px; color: #188038; font-weight: bold; margin-bottom: 5px; }
-        .route-subtext { font-size: 14px; color: #70757a; margin-bottom: 20px; }
+        /* FLOATING E-BIKE DASHBOARD (Responsive) */
+        .ebike-dash { position: absolute; top: 120px; right: 15px; width: 160px; background: rgba(255,255,255,0.95); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); padding: 15px; z-index: 999; backdrop-filter: blur(5px); }
+        .dash-title { font-size: 12px; font-weight: bold; color: #555; text-align: center; margin-bottom: 10px; text-transform: uppercase; }
+        .dash-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 14px; font-weight: bold; }
+        .dash-val { color: #1a73e8; font-size: 16px; }
+        .dash-val.red { color: #ea4335; }
         
-        .start-btn-pill { background: #1a73e8; color: white; border: none; border-radius: 30px; padding: 12px 30px; font-size: 16px; font-weight: 500; display: flex; align-items: center; gap: 8px; cursor: pointer; display: none; }
+        .bat-input-group { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-size: 12px; font-weight: bold; }
+        .bat-input-group input { width: 50px; border: 1px solid #ccc; border-radius: 4px; padding: 4px; text-align: center; font-weight: bold; }
         
-        .floating-controls { position: absolute; right: 15px; top: 160px; display: flex; flex-direction: column; gap: 10px; z-index: 999; transition: 0.3s; }
-        .floating-controls.hidden { opacity: 0; pointer-events: none; }
-        .float-btn { width: 50px; height: 50px; border-radius: 50%; background: white; border: none; box-shadow: 0 2px 6px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; cursor: pointer; color: #5f6368; font-size: 24px; }
-        
-        /* NAVIGATION MODE UI */
-        .nav-turn-banner { position: absolute; top: 15px; left: 5%; width: 90%; background: #0b6050; color: white; border-radius: 12px; padding: 20px; z-index: 1001; box-shadow: 0 4px 12px rgba(0,0,0,0.3); display: none; flex-direction: row; align-items: center; opacity: 0; transition: 0.4s; }
-        .nav-turn-banner i { font-size: 40px; margin-right: 20px; }
-        .turn-dist { font-size: 16px; font-weight: bold; margin-bottom: 2px; }
-        .turn-text { font-size: 24px; font-weight: bold; }
+        .btn-reset { width: 100%; background: #ea4335; color: white; border: none; padding: 8px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 5px; text-transform: uppercase; font-size: 12px; }
+        .btn-reset:active { background: #c5221f; }
 
-        .nav-speed-widget { position: absolute; bottom: 140px; left: 15px; width: 70px; height: 70px; background: rgba(0,0,0,0.8); border: 2px solid white; border-radius: 50%; z-index: 1001; display: none; flex-direction: column; align-items: center; justify-content: center; color: white; box-shadow: 0 4px 10px rgba(0,0,0,0.3); opacity: 0; transition: 0.4s; }
-        .nav-speed-value { font-size: 28px; font-weight: bold; line-height: 1; }
-        .nav-speed-unit { font-size: 12px; font-weight: 500; }
-
-        .nav-stats-widget { position: absolute; top: 120px; right: 15px; background: rgba(0,0,0,0.7); color: white; padding: 10px 15px; border-radius: 12px; z-index: 1001; display: none; flex-direction: column; opacity: 0; transition: 0.4s; text-align: right; }
-        .nav-stats-widget .stat-val { font-size: 18px; font-weight: bold; color: #4caf50; }
+        /* BOTTOM ROUTE / START PANEL */
+        .bottom-panel { position: absolute; bottom: 0; left: 0; width: 100%; background: white; border-radius: 20px 20px 0 0; padding: 20px; z-index: 1000; box-shadow: 0 -4px 20px rgba(0,0,0,0.2); transition: 0.3s; display: flex; flex-direction: column; gap: 10px; }
+        .bottom-panel.hidden { transform: translateY(100%); }
+        .route-title { font-size: 22px; color: #188038; font-weight: bold; }
+        .route-desc { font-size: 13px; color: #555; }
         
-        .nav-bottom-bar { position: absolute; bottom: 0; left: 0; width: 100%; background: #000; color: white; padding: 20px 20px 30px 20px; z-index: 1000; display: none; flex-direction: column; align-items: center; border-radius: 20px 20px 0 0; opacity: 0; transition: 0.4s; }
-        .nav-eta { font-size: 32px; color: #5bb974; font-weight: bold; margin-bottom: 5px; }
-        .nav-stats { font-size: 16px; color: #aaa; }
-        .nav-close-btn { position: absolute; left: 20px; top: 50%; transform: translateY(-50%); width: 45px; height: 45px; border-radius: 50%; background: #222; border: none; color: white; font-size: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .btn-start { background: #1a73e8; color: white; border: none; border-radius: 30px; padding: 15px; font-size: 18px; font-weight: bold; cursor: pointer; width: 100%; display: flex; justify-content: center; align-items: center; gap: 10px; }
+        .btn-stop { background: #ea4335; display: none; }
 
-        /* Setup Widgets */
-        .ebike-widget { position: absolute; top: 120px; left: 15px; background: rgba(255,255,255,0.9); padding: 10px; border-radius: 12px; z-index: 999; box-shadow: 0 2px 6px rgba(0,0,0,0.2); width: 150px; }
-        .ebike-widget input { width: 40px; border: 1px solid #ccc; border-radius: 4px; padding: 2px; margin-left: 5px; text-align: center; }
+        /* GPS RECENTER BUTTON */
+        .btn-gps { position: absolute; bottom: 150px; right: 15px; width: 50px; height: 50px; background: white; border: none; border-radius: 50%; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; cursor: pointer; color: #1a73e8; z-index: 999; }
+        
+        /* TURN BANNER */
+        .turn-banner { position: absolute; top: 15px; left: 5%; width: 90%; max-width: 400px; background: #0b6050; color: white; border-radius: 12px; padding: 15px; z-index: 1001; box-shadow: 0 4px 15px rgba(0,0,0,0.3); display: none; align-items: center; opacity: 0; transition: 0.3s; }
+        .turn-banner i { font-size: 35px; margin-right: 15px; }
 
-        /* Loader */
-        .loader { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2000; background: rgba(0,0,0,0.7); color: white; padding: 15px 25px; border-radius: 30px; font-weight: bold; display: flex; align-items: center; gap: 10px; transition: 0.3s; }
+        /* TOAST NOTIFICATION */
+        .toast { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: white; padding: 10px 20px; border-radius: 20px; z-index: 2000; font-weight: bold; display: none; }
+
+        @media (orientation: landscape) {
+            .ebike-dash { right: auto; left: 15px; top: 100px; }
+            .btn-gps { right: auto; left: 15px; bottom: 20px; }
+            .bottom-panel { width: 350px; left: auto; right: 15px; bottom: 15px; border-radius: 15px; }
+        }
     </style>
 </head>
 <body>
 
-    <div class="loader" id="loader"><i class="material-icons">gps_fixed</i> Kumukuha ng Lokasyon...</div>
-
+    <div class="toast" id="toast">Locating...</div>
     <div id="map"></div>
 
-    <div class="setup-top-panel" id="setup-top-panel">
+    <div class="search-panel" id="search-panel">
         <div class="input-row">
-            <div class="dot"></div>
-            <input type="text" value="Your location" readonly style="color: #1a73e8; font-weight: 500;">
+            <i class="material-icons">my_location</i>
+            <input type="text" value="Your Location" readonly>
         </div>
         <div class="input-row" style="position: relative;">
-            <i class="material-icons pin">location_on</i>
-            <input type="text" id="dest-input" placeholder="Choose destination" oninput="fetchSuggestions(this.value)" autocomplete="off">
-            <div class="suggestions-container" id="suggestions-box"></div>
+            <i class="material-icons" style="color: #ea4335;">location_on</i>
+            <input type="text" id="dest-input" placeholder="Where to?" oninput="fetchSuggestions(this.value)" autocomplete="off">
+            <div class="suggestions" id="suggestions-box"></div>
         </div>
     </div>
 
-    <div class="floating-controls" id="floating-controls">
-        <button class="float-btn" onclick="recenterMap()"><i class="material-icons">my_location</i></button>
-        <button class="float-btn" onclick="toggleMapType()"><i class="material-icons">layers</i></button>
-    </div>
-
-    <div class="ebike-widget" id="ebike-widget">
-        <div style="font-size: 12px; color: #555; margin-bottom: 5px;"><strong>E-Bike Set</strong></div>
-        <div style="font-size: 11px;">Bat: <input type="number" id="battery-input" value="100" max="100" min="0" oninput="updateInitialRange()"> %</div>
-        <div style="font-size: 11px; margin-top: 3px; color: #188038;">Max: <strong id="initial-range">30.0</strong> km</div>
-    </div>
-
-    <div class="setup-bottom-panel" id="setup-bottom-panel">
-        <div id="setup-info" style="display: none;">
-            <div class="route-info-preview" id="preview-eta">-- min</div>
-            <div class="route-subtext" id="preview-dist">-- km • Tap light blue line for alternate route</div>
+    <!-- E-BIKE MANAGER (Trip & Battery) -->
+    <div class="ebike-dash" id="ebike-dash">
+        <div class="dash-title">E-Bike Manager</div>
+        
+        <div class="bat-input-group">
+            Set Battery: 
+            <div><input type="number" id="battery-input" value="100" max="100" min="0" onchange="manualBatteryUpdate()"> %</div>
         </div>
-        <button class="start-btn-pill" id="start-btn" onclick="startNavigation()">
-            <i class="material-icons">navigation</i> Start
+        <hr style="border: 0; border-top: 1px solid #ddd; margin: 10px 0;">
+        
+        <div class="dash-row">Trip: <span class="dash-val" id="disp-trip">0.00 km</span></div>
+        <div class="dash-row">Live Bat: <span class="dash-val" id="disp-bat">100.0%</span></div>
+        <div class="dash-row">Range: <span class="dash-val" id="disp-range">30.0 km</span></div>
+        <div class="dash-row">Speed: <span class="dash-val" id="disp-speed">0 km/h</span></div>
+        
+        <button class="btn-reset" onclick="resetTripMeter()"><i class="material-icons" style="font-size:14px; vertical-align:middle;">refresh</i> Reset Trip</button>
+    </div>
+
+    <button class="btn-gps" onclick="forceAccurateLocation()"><i class="material-icons">gps_fixed</i></button>
+
+    <div class="bottom-panel" id="bottom-panel" style="display: none;">
+        <div>
+            <div class="route-title" id="route-eta">-- min</div>
+            <div class="route-desc" id="route-dist">-- km • E-Bike Route (No Tolls)</div>
+            <div class="route-desc" style="color:#1a73e8; font-weight:bold; margin-top:5px;">*Tap faded blue line for alternate route</div>
+        </div>
+        <button class="btn-start" id="btn-start" onclick="toggleNav()">
+            <i class="material-icons">navigation</i> START
+        </button>
+        <button class="btn-start btn-stop" id="btn-stop" onclick="toggleNav()">
+            <i class="material-icons">close</i> EXIT NAVIGATION
         </button>
     </div>
 
-    <div class="nav-turn-banner" id="nav-turn-banner">
-        <i class="material-icons" id="turn-icon">arrow_upward</i>
+    <div class="turn-banner" id="turn-banner">
+        <i class="material-icons" id="turn-icon">straight</i>
         <div>
-            <div class="turn-dist" id="turn-dist">Continue</div>
-            <div class="turn-text" id="turn-text">Follow route</div>
+            <div style="font-size:14px; font-weight:bold;">Next</div>
+            <div style="font-size:20px; font-weight:bold;" id="turn-text">Follow the blue line</div>
         </div>
-    </div>
-
-    <div class="nav-speed-widget" id="nav-speed-widget">
-        <div class="nav-speed-value" id="nav-speed">0</div>
-        <div class="nav-speed-unit">km/h</div>
-    </div>
-
-    <div class="nav-stats-widget" id="nav-stats-widget">
-        <div style="font-size: 10px; color:#aaa;">TRIP</div>
-        <div class="stat-val" id="nav-trip-meter">0.0 km</div>
-        <div style="font-size: 10px; color:#aaa; margin-top: 5px;">BATTERY</div>
-        <div class="stat-val" id="nav-bat-meter">100%</div>
-    </div>
-
-    <div class="nav-bottom-bar" id="nav-bottom-bar">
-        <button class="nav-close-btn" onclick="stopNavigation()"><i class="material-icons">close</i></button>
-        <div class="nav-eta" id="nav-eta">-- min</div>
-        <div class="nav-stats"><span id="nav-dist-rem">-- km</span> • <span id="nav-time-arrival">--:--</span></div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
     <script>
-        // Init Map
-        const map = L.map('map', { zoomControl: false }).setView([12.8797, 121.7740], 6); // Default PH center
-        
-        const streetMap = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 20, attribution: '© Google' });
-        const satelliteHybrid = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { maxZoom: 20, attribution: '© Google' });
-        
-        let currentMapType = 'street';
-        streetMap.addTo(map);
-
-        function toggleMapType() {
-            if (currentMapType === 'street') { map.removeLayer(streetMap); satelliteHybrid.addTo(map); currentMapType = 'hybrid'; }
-            else { map.removeLayer(satelliteHybrid); streetMap.addTo(map); currentMapType = 'street'; }
-        }
+        // MAP INITIALIZATION
+        const map = L.map('map', { zoomControl: false }).setView([12.8797, 121.7740], 6);
+        L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 20 }).addTo(map);
 
         const carIcon = L.divIcon({
-            html: `<svg width="40" height="40" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-              <rect x="30" y="20" width="40" height="60" rx="12" fill="#ffffff" stroke="#cccccc" stroke-width="2"/>
-              <rect x="34" y="30" width="32" height="15" rx="3" fill="#333333"/>
-              <rect x="34" y="65" width="32" height="10" rx="2" fill="#333333"/>
+            html: `<svg width="45" height="45" viewBox="0 0 100 100">
+              <rect x="25" y="15" width="50" height="70" rx="15" fill="#1a73e8" stroke="#fff" stroke-width="3"/>
+              <rect x="32" y="30" width="36" height="18" rx="4" fill="#111"/>
+              <rect x="32" y="68" width="36" height="10" rx="3" fill="#111"/>
             </svg>`,
-            className: '', iconSize: [40, 40], iconAnchor: [20, 20]
+            className: '', iconSize: [45, 45], iconAnchor: [22, 22]
         });
 
         let marker = null;
-        let currentLat = null, currentLng = null, currentHeading = 0;
+        let currentLat = null, currentLng = null;
         let isNavigating = false;
         let routingControl = null;
         let destinationLatLng = null;
-        let activeRouteCoords = [];
-        
-        // Trip & Battery tracking ONLY active during navigation
-        let totalTripDistance = 0; 
-        let startingBattery = 100;
-        let lastCoordsNav = null; 
-        let isRerouting = false;
 
-        // 1. HIGH ACCURACY INITIAL LOCATION
-        navigator.geolocation.getCurrentPosition(pos => {
-            currentLat = pos.coords.latitude;
-            currentLng = pos.coords.longitude;
-            map.setView([currentLat, currentLng], 17);
-            marker = L.marker([currentLat, currentLng], {icon: carIcon}).addTo(map);
-            document.getElementById('loader').style.opacity = '0';
-            setTimeout(() => document.getElementById('loader').style.display = 'none', 300);
-        }, err => {
-            alert("Pakibuksan ang GPS Location ng iyong phone.");
-            document.getElementById('loader').innerText = "Location Error";
-        }, { enableHighAccuracy: true, timeout: 10000 });
+        // BATTERY & TRIP VARIABLES
+        const MAX_RANGE = 30.0; // 100% = 30km
+        let startBattery = 100.0;
+        let tripDistance = 0.0;
+        let lastTrackedCoords = null;
+        let currentLiveBattery = 100.0;
 
-        // Autocomplete
-        let debounceTimer;
+        // 1. HIGH ACCURACY LOCATION REQUEST
+        function forceAccurateLocation() {
+            showToast("Kumukuha ng tumpak na lokasyon...");
+            navigator.geolocation.getCurrentPosition(pos => {
+                currentLat = pos.coords.latitude;
+                currentLng = pos.coords.longitude;
+                updateMarker();
+                map.setView([currentLat, currentLng], isNavigating ? 19 : 17, {animate: true});
+                hideToast();
+            }, err => {
+                showToast("Bigo. Paki-on ang GPS Location ng phone.");
+                setTimeout(hideToast, 3000);
+            }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }); // maximumAge: 0 forces fresh GPS data
+        }
+
+        function updateMarker() {
+            if(!marker) marker = L.marker([currentLat, currentLng], {icon: carIcon}).addTo(map);
+            else marker.setLatLng([currentLat, currentLng]);
+        }
+
+        forceAccurateLocation(); // Initial call on load
+
+        // SEARCH SUGGESTIONS
+        let debounce;
         async function fetchSuggestions(query) {
             const box = document.getElementById('suggestions-box');
             if (query.length < 3) { box.style.display = 'none'; return; }
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(async () => {
+            clearTimeout(debounce);
+            debounce = setTimeout(async () => {
                 try {
                     const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=ph&q=${encodeURIComponent(query)}`);
                     const data = await res.json();
                     box.innerHTML = '';
                     if (data.length > 0) {
-                        data.slice(0, 5).forEach(item => {
+                        data.slice(0, 4).forEach(item => {
                             const div = document.createElement('div'); div.className = 'suggestion-item';
-                            div.innerHTML = `<i class="material-icons">location_on</i><div style="font-size:14px;">${item.display_name}</div>`;
+                            div.innerHTML = `<i class="material-icons" style="color:#777; margin-right:10px;">place</i><div style="font-size:14px;">${item.display_name}</div>`;
                             div.onclick = () => {
                                 document.getElementById('dest-input').value = item.name || item.display_name.split(',')[0];
                                 box.style.display = 'none';
@@ -208,216 +200,159 @@
                             box.appendChild(div);
                         });
                         box.style.display = 'block';
-                    } else box.style.display = 'none';
-                } catch (e) {}
+                    }
+                } catch(e){}
             }, 500);
         }
 
-        window.recenterMap = function() {
-            if(!currentLat) return;
-            map.panTo([currentLat, currentLng], { animate: true, duration: 0.5 });
-            map.setZoom(isNavigating ? 19 : 17, { animate: true });
-        };
-
-        // 2. ALTERNATE ROUTES (Light Blue & Clickable)
+        // 2. E-BIKE ROUTING WITH ALTERNATES
         function routeTo(lat, lng) {
-            if(!currentLat) return;
+            if(!currentLat) { forceAccurateLocation(); return; }
             destinationLatLng = L.latLng(lat, lng);
             if(routingControl) map.removeControl(routingControl);
             
+            showToast("Naghahanap ng e-bike route...");
+
             routingControl = L.Routing.control({
                 waypoints: [ L.latLng(currentLat, currentLng), destinationLatLng ],
-                router: L.Routing.osrmv1({ profile: 'driving' }), // 'driving' generates more alternates than 'bike'
+                // Ginamit ang OSRM Bike Service para iwas Toll/Expressway
+                router: L.Routing.osrmv1({ serviceUrl: 'https://routing.openstreetmap.de/routed-bike/route/v1' }),
                 routeWhileDragging: false,
                 addWaypoints: false,
-                showAlternatives: true, // Show 3 routes if available
-                lineOptions: { styles: [{color: '#1a73e8', opacity: 1, weight: 8}] }, // Main Route (Solid Blue)
-                altLineOptions: { styles: [{color: '#8ab4f8', opacity: 0.8, weight: 6}] }, // Alternate Routes (Light Blue)
+                showAlternatives: true, // AUTO SEARCH FOR ALTERNATES
+                altLineOptions: { styles: [{color: '#8ab4f8', opacity: 0.9, weight: 6}] }, // Faded Blue (Clickable)
+                lineOptions: { styles: [{color: '#1a73e8', opacity: 1, weight: 8}] }, // Main Blue
                 createMarker: function(i, wp) {
-                    if (i === 0) return null;
-                    return L.marker(wp.latLng); 
+                    if (i === 0) return null; // No default start marker, we have our car
+                    return L.marker(wp.latLng); // Dest marker
                 }
             }).on('routesfound', function(e) {
+                hideToast();
                 const primary = e.routes[0];
-                activeRouteCoords = primary.coordinates; // Save for auto-reroute check
-                
                 const distKm = (primary.summary.totalDistance / 1000).toFixed(1);
                 const timeMin = Math.round(primary.summary.totalTime / 60);
                 
-                document.getElementById('preview-eta').innerText = timeMin + " min";
-                document.getElementById('preview-dist').innerText = distKm + " km";
-                document.getElementById('setup-info').style.display = 'block';
-                document.getElementById('start-btn').style.display = 'flex';
+                document.getElementById('route-eta').innerText = timeMin + " min";
+                document.getElementById('route-dist').innerText = distKm + " km";
+                document.getElementById('bottom-panel').style.display = 'flex';
                 
-                map.fitBounds(L.latLngBounds([L.latLng(currentLat, currentLng), destinationLatLng]), { padding: [50, 50] });
+                map.fitBounds(L.latLngBounds([L.latLng(currentLat, currentLng), destinationLatLng]), { padding: [40, 40] });
             }).addTo(map);
         }
 
-        // Start Navigation
-        window.startNavigation = function() {
-            isNavigating = true;
-            
-            // Reset Trip & Battery tracker on start
-            totalTripDistance = 0;
-            startingBattery = parseFloat(document.getElementById('battery-input').value) || 100;
-            lastCoordsNav = { lat: currentLat, lng: currentLng };
-            
-            document.getElementById('setup-top-panel').classList.add('hidden');
-            document.getElementById('setup-bottom-panel').classList.add('hidden');
-            document.getElementById('ebike-widget').style.display = 'none';
-            document.getElementById('floating-controls').classList.add('hidden');
-            
-            document.getElementById('nav-turn-banner').style.display = 'flex';
-            document.getElementById('nav-speed-widget').style.display = 'flex';
-            document.getElementById('nav-stats-widget').style.display = 'flex';
-            document.getElementById('nav-bottom-bar').style.display = 'flex';
-            
-            setTimeout(() => {
-                document.getElementById('nav-turn-banner').style.opacity = '1';
-                document.getElementById('nav-speed-widget').style.opacity = '1';
-                document.getElementById('nav-stats-widget').style.opacity = '1';
-                document.getElementById('nav-bottom-bar').style.opacity = '1';
-            }, 10);
-            
-            // Overhead close zoom (NO weird 3D tilt)
-            map.setView([currentLat, currentLng], 19, {animate: true});
-            speak("Navigation started.");
-        };
+        // 3. BATTERY & TRIP MANAGEMENT LOGIC
+        function manualBatteryUpdate() {
+            startBattery = parseFloat(document.getElementById('battery-input').value) || 0;
+            if(startBattery > 100) startBattery = 100;
+            if(startBattery < 0) startBattery = 0;
+            tripDistance = 0; // Reset trip on manual battery change
+            updateDashboard();
+        }
 
-        window.stopNavigation = function() {
-            isNavigating = false;
+        function updateDashboard() {
+            let batteryUsed = (tripDistance / MAX_RANGE) * 100;
+            currentLiveBattery = startBattery - batteryUsed;
+            if(currentLiveBattery < 0) currentLiveBattery = 0;
             
-            document.getElementById('nav-turn-banner').style.opacity = '0';
-            document.getElementById('nav-speed-widget').style.opacity = '0';
-            document.getElementById('nav-stats-widget').style.opacity = '0';
-            document.getElementById('nav-bottom-bar').style.opacity = '0';
+            let currentRange = (currentLiveBattery / 100) * MAX_RANGE;
             
-            setTimeout(() => {
-                document.getElementById('nav-turn-banner').style.display = 'none';
-                document.getElementById('nav-speed-widget').style.display = 'none';
-                document.getElementById('nav-stats-widget').style.display = 'none';
-                document.getElementById('nav-bottom-bar').style.display = 'none';
-            }, 400);
+            document.getElementById('disp-trip').innerText = tripDistance.toFixed(2) + " km";
             
-            document.getElementById('setup-top-panel').classList.remove('hidden');
-            document.getElementById('setup-bottom-panel').classList.remove('hidden');
-            document.getElementById('ebike-widget').style.display = 'block';
-            document.getElementById('floating-controls').classList.remove('hidden');
+            const batEl = document.getElementById('disp-bat');
+            batEl.innerText = currentLiveBattery.toFixed(1) + "%";
+            batEl.className = currentLiveBattery <= 20 ? "dash-val red" : "dash-val";
             
-            map.setZoom(17, {animate: true});
-            speak("Navigation ended.");
-        };
+            document.getElementById('disp-range').innerText = currentRange.toFixed(1) + " km";
+        }
 
-        // 3. AUTO-REROUTE Logic (Check if off-route)
-        function checkOffRoute(lat, lng) {
-            if(!activeRouteCoords || activeRouteCoords.length === 0) return;
-            let minDist = Infinity;
-            for(let i=0; i<activeRouteCoords.length; i++) {
-                let d = map.distance([lat, lng], activeRouteCoords[i]);
-                if(d < minDist) minDist = d;
-            }
+        // ANG HINAHANAP MONG RESET BUTTON LOGIC
+        window.resetTripMeter = function() {
+            // Wag i-reset ang battery sa 100! 
+            // Gawing "Starting Battery" kung ano man ang natitirang battery ngayon.
+            startBattery = currentLiveBattery;
+            tripDistance = 0; // Zero out ang trip meter
             
-            // Kung lumagpas ng 50 meters sa asul na linya, mag REROUTE
-            if(minDist > 50 && !isRerouting) {
-                isRerouting = true;
-                speak("Rerouting");
-                document.getElementById('turn-text').innerText = "Rerouting...";
+            // I-update din yung input box para malinaw
+            document.getElementById('battery-input').value = startBattery.toFixed(1);
+            updateDashboard();
+        }
+
+        // NAVIGATION TOGGLE
+        window.toggleNav = function() {
+            if(!isNavigating) {
+                // START
+                isNavigating = true;
+                lastTrackedCoords = {lat: currentLat, lng: currentLng}; // Start tracking trip from here
                 
-                // Silently update the starting waypoint of the active route
-                routingControl.spliceWaypoints(0, 1, L.latLng(lat, lng));
+                document.getElementById('search-panel').classList.add('hidden');
+                document.getElementById('btn-start').style.display = 'none';
+                document.getElementById('btn-stop').style.display = 'flex';
                 
-                setTimeout(() => { isRerouting = false; }, 8000); // Cooldown bago mag reroute ulit
+                document.getElementById('turn-banner').style.display = 'flex';
+                setTimeout(()=> document.getElementById('turn-banner').style.opacity = '1', 50);
+                
+                map.setView([currentLat, currentLng], 19, {animate: true});
+            } else {
+                // STOP
+                isNavigating = false;
+                
+                document.getElementById('search-panel').classList.remove('hidden');
+                document.getElementById('btn-start').style.display = 'flex';
+                document.getElementById('btn-stop').style.display = 'none';
+                
+                document.getElementById('turn-banner').style.opacity = '0';
+                setTimeout(()=> document.getElementById('turn-banner').style.display = 'none', 300);
+                
+                map.setZoom(17, {animate: true});
             }
         }
 
-        // Live GPS Tracking & Battery Drain Update
+        // LIVE GPS TRACKING & DISTANCE CALCULATION
         if (navigator.geolocation) {
-            navigator.geolocation.watchPosition(position => {
-                if(!currentLat) return; // Prevent early triggers
-                currentLat = position.coords.latitude;
-                currentLng = position.coords.longitude;
-                const speedKmh = position.coords.speed ? (position.coords.speed * 3.6) : 0; 
+            navigator.geolocation.watchPosition(pos => {
+                if(!currentLat) return;
+                currentLat = pos.coords.latitude;
+                currentLng = pos.coords.longitude;
+                const speed = pos.coords.speed ? (pos.coords.speed * 3.6) : 0;
                 
-                const newLatLng = new L.LatLng(currentLat, currentLng);
-                if(marker) marker.setLatLng(newLatLng);
-                
-                if(isNavigating && !isRerouting) {
-                    map.panTo(newLatLng, {animate: true, duration: 0.5});
-                    checkOffRoute(currentLat, currentLng);
+                document.getElementById('disp-speed').innerText = Math.round(speed) + " km/h";
+                updateMarker();
+
+                // Compute Trip & Battery if Navigating
+                if(isNavigating) {
+                    map.panTo([currentLat, currentLng], {animate: true});
+                    
+                    if(lastTrackedCoords) {
+                        const moved = map.distance(lastTrackedCoords, [currentLat, currentLng]) / 1000;
+                        tripDistance += moved;
+                        updateDashboard();
+                    }
+                    lastTrackedCoords = {lat: currentLat, lng: currentLng};
+                    
+                    // Simple Turn Instructions Mock
+                    if(destinationLatLng) {
+                        const d = map.distance([currentLat, currentLng], destinationLatLng);
+                        if(d < 30) {
+                            document.getElementById('turn-text').innerText = "Arrived at destination!";
+                            document.getElementById('turn-icon').innerText = "flag";
+                            toggleNav(); // Auto exit
+                        }
+                    }
                 }
 
                 // Car Rotation
-                if (speedKmh > 1) { 
-                    if (position.coords.heading !== null && !isNaN(position.coords.heading)) {
-                        currentHeading = position.coords.heading;
-                    } else if(lastCoordsNav) {
-                        const dLon = (currentLng - lastCoordsNav.lng) * Math.PI / 180;
-                        const lat1 = lastCoordsNav.lat * Math.PI / 180;
-                        const lat2 = currentLat * Math.PI / 180;
-                        const y = Math.sin(dLon) * Math.cos(lat2);
-                        const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
-                        currentHeading = ((Math.atan2(y, x) * 180 / Math.PI) + 360) % 360;
-                    }
-                    document.querySelector('.leaflet-marker-icon div').style.transform = `rotate(${currentHeading}deg)`;
+                if(speed > 1 && pos.coords.heading !== null && !isNaN(pos.coords.heading)) {
+                    document.querySelector('.leaflet-marker-icon div').style.transform = `rotate(${pos.coords.heading}deg)`;
                 }
-
-                // 4. Trip Meter & Battery Computations (Runs ONLY when navigating)
-                if (isNavigating && lastCoordsNav) {
-                    const moved = map.distance(lastCoordsNav, newLatLng) / 1000; // in km
-                    totalTripDistance += moved;
-                    document.getElementById('nav-trip-meter').innerText = totalTripDistance.toFixed(2) + " km";
-                    
-                    // Battery Computation (30km = 100%, 1km = 3.33%)
-                    let batUsed = (totalTripDistance / 30) * 100;
-                    let currentBat = startingBattery - batUsed;
-                    if(currentBat < 0) currentBat = 0;
-                    
-                    document.getElementById('nav-bat-meter').innerText = currentBat.toFixed(1) + "%";
-                    if(currentBat <= 20) document.getElementById('nav-bat-meter').style.color = '#f44336';
-                }
-                if(isNavigating) lastCoordsNav = { lat: currentLat, lng: currentLng };
-                
-                document.getElementById('nav-speed').innerText = Math.round(speedKmh);
-                
-                // Live ETA Updates
-                if(isNavigating && destinationLatLng && !isRerouting) {
-                    const d = map.distance([currentLat, currentLng], destinationLatLng);
-                    const distKm = (d/1000).toFixed(1);
-                    const minLeft = Math.round(distKm * 3); // Approx 20km/h
-                    
-                    document.getElementById('nav-eta').innerText = (minLeft > 60 ? Math.floor(minLeft/60) + " hr " + (minLeft%60) : minLeft) + " min";
-                    document.getElementById('nav-dist-rem').innerText = distKm + " km";
-                    
-                    const now = new Date();
-                    now.setMinutes(now.getMinutes() + minLeft);
-                    let hours = now.getHours();
-                    let ampm = hours >= 12 ? 'PM' : 'AM';
-                    hours = hours % 12 || 12;
-                    let mins = now.getMinutes().toString().padStart(2, '0');
-                    document.getElementById('nav-time-arrival').innerText = hours + ":" + mins + " " + ampm;
-                    
-                    if(d < 50) {
-                        document.getElementById('turn-text').innerText = "You have arrived";
-                        document.getElementById('turn-icon').innerText = "flag";
-                        speak("You have arrived at your destination.");
-                        stopNavigation();
-                    }
-                }
-            }, err => console.log(err), { enableHighAccuracy: true });
+            }, err => {}, { enableHighAccuracy: true, maximumAge: 0 }); // Max accuracy forced continuously
         }
 
-        window.updateInitialRange = function() {
-            let bat = parseFloat(document.getElementById('battery-input').value) || 0;
-            if (bat > 100) bat = 100; if (bat < 0) bat = 0;
-            document.getElementById('initial-range').innerText = (bat * 0.3).toFixed(1);
-        };
-        
-        window.speak = function(text) {
-            if (!window.speechSynthesis) return;
-            let msg = new SpeechSynthesisUtterance(text);
-            msg.lang = 'en-US'; 
-            window.speechSynthesis.speak(msg);
-        };
+        // UTILS
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.innerText = msg; t.style.display = 'block';
+        }
+        function hideToast() { document.getElementById('toast').style.display = 'none'; }
     </script>
 </body>
 </html>
