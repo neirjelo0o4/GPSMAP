@@ -3,22 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>E-Bike Dashboard</title>
+    <title>E-Bike Map & Dash</title>
     <link rel="manifest" href="manifest.json">
-    <!-- Leaflet CSS para sa Map -->
+    
+    <!-- Leaflet CSS & Routing CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
+    
     <style>
         body { margin: 0; font-family: Arial, sans-serif; background: #121212; color: white; display: flex; flex-direction: column; height: 100vh; }
-        .dashboard { padding: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #1e1e1e; z-index: 10; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-        .box { background: #2c2c2c; padding: 15px; border-radius: 8px; text-align: center; }
-        .value { font-size: 2em; font-weight: bold; color: #4caf50; }
-        .label { font-size: 0.8em; color: #aaa; text-transform: uppercase; }
+        .dashboard { padding: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #1e1e1e; z-index: 10; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        .box { background: #2c2c2c; padding: 10px; border-radius: 8px; text-align: center; }
+        .value { font-size: 1.8em; font-weight: bold; color: #4caf50; }
+        .label { font-size: 0.75em; color: #aaa; text-transform: uppercase; margin-top: 5px; }
         .mode { font-size: 1.2em; font-weight: bold; color: #ffeb3b; }
         #map { flex-grow: 1; width: 100%; }
-        /* Battery Bar */
-        .battery-container { grid-column: span 2; background: #2c2c2c; padding: 10px; border-radius: 8px; display: flex; align-items: center; gap: 10px; }
-        .battery-outline { width: 100%; height: 20px; border: 2px solid #aaa; border-radius: 4px; padding: 2px; position: relative; }
-        .battery-level { height: 100%; background: #4caf50; width: 100%; transition: width 0.3s; }
+        
+        /* Battery Input Styling */
+        input[type="number"] { width: 60px; font-size: 1em; background: #121212; color: white; border: 1px solid #4caf50; text-align: center; border-radius: 5px; padding: 5px; font-weight: bold;}
+        
+        /* Hide Default Routing Text Box para malinis tignan sa phone */
+        .leaflet-routing-container { display: none !important; }
     </style>
 </head>
 <body>
@@ -32,23 +37,23 @@
             <div class="value" id="distance">0.00</div>
             <div class="label">Trip (KM)</div>
         </div>
-        <div class="box" style="grid-column: span 2;">
+        <div class="box">
             <div class="mode" id="speed-mode">IDLE</div>
             <div class="label">Current Mode</div>
         </div>
-        <div class="battery-container">
-            <span class="label">BAT</span>
-            <div class="battery-outline">
-                <div class="battery-level" id="battery-bar"></div>
+        <div class="box">
+            <div>
+                <input type="number" id="battery-input" value="100" max="100" min="0" oninput="updateRange()"> <span style="font-size: 1.2em; font-weight: bold;">%</span>
             </div>
-            <span id="battery-text">100%</span>
+            <div class="label" style="color: #4caf50;">Est. Range: <span id="est-range">30</span> KM</div>
         </div>
     </div>
 
     <div id="map"></div>
 
-    <!-- Leaflet JS -->
+    <!-- Leaflet JS & Routing JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
