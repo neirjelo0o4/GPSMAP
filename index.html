@@ -3,92 +3,422 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>E-Bike Map & Dash</title>
-    <link rel="manifest" href="manifest.json">
+    <title>Modern E-Bike Dashboard</title>
     
+    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
     
     <style>
-        body { margin: 0; font-family: Arial, sans-serif; background: #121212; color: white; display: flex; flex-direction: column; height: 100vh; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
         
-        /* Waze-like Navigation Banner */
-        .nav-banner { background: #1565C0; color: white; padding: 12px; text-align: center; font-weight: bold; font-size: 1.1em; z-index: 1000; box-shadow: 0 4px 5px rgba(0,0,0,0.3); border-bottom: 2px solid #0D47A1; }
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; overflow: hidden; overscroll-behavior: none; }
         
-        .dashboard { padding: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #1e1e1e; z-index: 10; }
-        .box { background: #2c2c2c; padding: 10px; border-radius: 8px; text-align: center; position: relative; }
-        .value { font-size: 1.8em; font-weight: bold; color: #4caf50; }
-        .label { font-size: 0.7em; color: #aaa; text-transform: uppercase; margin-top: 5px; letter-spacing: 1px; }
-        .mode { font-size: 1.2em; font-weight: bold; color: #ffeb3b; margin-top: 5px;}
+        /* Glassmorphism utilities */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
         
-        .btn-reset { position: absolute; top: 5px; right: 5px; background: #f44336; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 0.6em; font-weight: bold; cursor: pointer; }
-        
-        /* Battery & Bar */
-        input[type="number"] { width: 50px; font-size: 1em; background: #121212; color: white; border: 1px solid #4caf50; text-align: center; border-radius: 5px; padding: 3px; font-weight: bold;}
-        .battery-bar-container { background: #121212; height: 12px; width: 100%; border-radius: 6px; overflow: hidden; margin-top: 8px; border: 1px solid #555; }
-        .battery-bar-fill { background: #4caf50; height: 100%; width: 100%; transition: width 0.5s, background 0.5s; }
+        .glass-box {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
 
-        .search-container { display: flex; padding: 10px; background: #1e1e1e; gap: 10px; z-index: 10; border-top: 1px solid #333; }
-        .search-container input { flex-grow: 1; padding: 10px; border-radius: 5px; border: none; font-size: 1em; background: #2c2c2c; color: white; }
-        .search-container button { padding: 10px 15px; background: #1565C0; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; }
-        
-        #map { flex-grow: 1; width: 100%; }
-        .leaflet-routing-container { display: none !important; } /* Hide default text box */
+        /* Map styling overrides */
+        #map { height: 100vh; width: 100vw; position: absolute; top: 0; left: 0; z-index: 0; background-color: #111; }
+        .leaflet-routing-container { display: none !important; } /* Hide default text routing */
+        .leaflet-control-zoom { border: none !important; margin-right: 15px !important; margin-bottom: 250px !important; }
+        .leaflet-bar a { background-color: rgba(15, 23, 42, 0.8) !important; color: white !important; border-color: #333 !important; backdrop-filter: blur(5px); }
+
+        /* Custom Vehicle Marker */
+        .vehicle-marker-wrapper {
+            transition: transform 0.1s linear; /* Smooth rotation */
+            width: 48px; height: 48px;
+            display: flex; justify-content: center; align-items: center;
+        }
+        .vehicle-marker {
+            width: 40px; height: 40px;
+            filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.8));
+        }
+
+        /* Battery Bar Animations */
+        .battery-fill { transition: width 0.5s ease-out, background-color 0.5s ease; }
     </style>
 </head>
-<body>
+<body class="text-white">
 
-    <div class="nav-banner" id="nav-banner">
-        Mag-search o mag-tap ng pupuntahan
+    <!-- Top Navigation Banner -->
+    <div id="nav-banner" class="absolute top-4 left-1/2 transform -translate-x-1/2 w-11/12 max-w-md glass-panel rounded-full py-3 px-6 text-center shadow-lg z-50 flex items-center justify-between border border-gray-600 transition-colors duration-300">
+        <span id="nav-text" class="text-sm font-semibold tracking-wide w-full">Search or tap destination</span>
     </div>
 
-    <div class="dashboard">
-        <!-- Speedometer -->
-        <div class="box">
-            <div class="value" id="speed">0</div>
-            <div class="label">Speed (KM/H)</div>
-        </div>
-        
-        <!-- Trip Meter w/ Reset -->
-        <div class="box">
-            <button class="btn-reset" onclick="resetTrip()">RESET</button>
-            <div class="value" id="distance">0.00</div>
-            <div class="label">Trip (KM)</div>
-        </div>
-        
-        <!-- Live Mode -->
-        <div class="box">
-            <div class="mode" id="speed-mode">IDLE</div>
-            <div class="label">Mode</div>
-        </div>
-        
-        <!-- Destination Distance -->
-        <div class="box">
-            <div class="value" id="dest-dist" style="color: #00bcd4;">0.00</div>
-            <div class="label">To Dest (KM)</div>
-        </div>
-        
-        <!-- Battery Input & Bar -->
-        <div class="box" style="grid-column: span 2;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-size: 0.9em; font-weight: bold; color: #aaa;">BAT: <input type="number" id="battery-input" value="100" max="100" min="0" oninput="updateRange()"> %</span>
-                <span style="color: #4caf50; font-weight: bold; font-size: 1.1em;">RANGE: <span id="est-range">30.0</span> KM</span>
-            </div>
-            <div class="battery-bar-container">
-                <div id="battery-bar-fill" class="battery-bar-fill"></div>
-            </div>
-        </div>
+    <!-- Search Box Overlay -->
+    <div class="absolute top-20 left-1/2 transform -translate-x-1/2 w-11/12 max-w-md z-50 flex gap-2">
+        <input type="text" id="dest-input" placeholder="Where to?" class="w-full glass-box px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+        <button onclick="searchDestination()" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-3 rounded-xl font-semibold shadow-lg transition duration-200">Go</button>
     </div>
 
-    <div class="search-container">
-        <input type="text" id="dest-input" placeholder="Saan mo gusto pumunta?">
-        <button onclick="searchDestination()">Route</button>
-    </div>
-
+    <!-- Map Container -->
     <div id="map"></div>
+
+    <!-- Bottom Dashboard Overlay -->
+    <div class="absolute bottom-0 w-full glass-panel pt-4 pb-6 px-4 z-40 rounded-t-3xl shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
+        <div class="max-w-4xl mx-auto grid grid-cols-4 gap-3">
+            
+            <!-- Speedometer -->
+            <div class="glass-box col-span-2 md:col-span-1 p-3 text-center flex flex-col justify-center items-center relative overflow-hidden">
+                <div class="absolute inset-0 bg-blue-500 opacity-5"></div>
+                <div id="speed" class="text-4xl font-black text-blue-400 tracking-tighter">0</div>
+                <div class="text-[10px] text-gray-400 uppercase tracking-widest mt-1">KM/H</div>
+            </div>
+
+            <!-- Mode -->
+            <div class="glass-box col-span-2 md:col-span-1 p-3 text-center flex flex-col justify-center items-center">
+                <div id="speed-mode" class="text-xl font-bold text-gray-500 tracking-wider">IDLE</div>
+                <div class="text-[10px] text-gray-400 uppercase tracking-widest mt-1">Mode</div>
+            </div>
+
+            <!-- Trip Meter -->
+            <div class="glass-box col-span-2 md:col-span-1 p-3 text-center flex flex-col justify-center items-center relative">
+                <button onclick="resetTrip()" class="absolute top-2 right-2 text-[9px] bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white border border-red-500/30 px-2 py-1 rounded transition">RESET</button>
+                <div id="distance" class="text-2xl font-bold text-white mt-3">0.00</div>
+                <div class="text-[10px] text-gray-400 uppercase tracking-widest mt-1">Trip (KM)</div>
+            </div>
+
+            <!-- To Destination -->
+            <div class="glass-box col-span-2 md:col-span-1 p-3 text-center flex flex-col justify-center items-center">
+                <div id="dest-dist" class="text-2xl font-bold text-teal-400">--</div>
+                <div class="text-[10px] text-gray-400 uppercase tracking-widest mt-1">To Dest (KM)</div>
+            </div>
+
+            <!-- Battery Management -->
+            <div class="glass-box col-span-4 p-4 mt-1 flex flex-col">
+                <div class="flex justify-between items-end mb-2">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        <span class="text-xs text-gray-400 uppercase tracking-wider font-semibold">Battery</span>
+                        <input type="number" id="battery-input" value="100" max="100" min="0" class="w-14 bg-black/40 border border-gray-600 rounded text-center text-sm text-white focus:outline-none focus:border-green-500 p-1 font-bold">
+                        <span class="text-xs text-gray-400">%</span>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xs text-gray-400 uppercase tracking-wider">Est Range</span>
+                        <div class="text-xl font-bold text-green-400"><span id="est-range">30.0</span> <span class="text-sm text-green-400/70">KM</span></div>
+                    </div>
+                </div>
+                <!-- Progress Bar -->
+                <div class="w-full h-2 bg-gray-800 rounded-full overflow-hidden mt-1 border border-gray-700/50">
+                    <div id="battery-bar-fill" class="h-full bg-green-500 battery-fill" style="width: 100%;"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
-    <script src="app.js"></script>
+    <script>
+        // Init Map with Modern Dark Theme (CartoDB Dark Matter)
+        const map = L.map('map', { zoomControl: false }).setView([14.5995, 120.9842], 18);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 20,
+            attribution: '© OpenStreetMap © CartoDB'
+        }).addTo(map);
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+        // Modern Sleek Navigation Arrow SVG
+        const arrowSvg = `
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#3b82f6" stroke="#ffffff" stroke-width="1.5">
+                <polygon points="12 2 2 22 12 18 22 22" />
+            </svg>`;
+        const iconUrl = 'data:image/svg+xml;base64,' + btoa(arrowSvg);
+
+        const customDivIcon = L.divIcon({
+            className: 'custom-vehicle-icon',
+            html: `<div id="vehicle-wrapper" class="vehicle-marker-wrapper"><img src="${iconUrl}" class="vehicle-marker"></div>`,
+            iconSize: [48, 48],
+            iconAnchor: [24, 24]
+        });
+
+        // Application State
+        let marker = L.marker([14.5995, 120.9842], {icon: customDivIcon, zIndexOffset: 1000}).addTo(map);
+        let totalDistance = 0; // For Trip Display
+        let lastCoords = null;
+        let currentLat = 14.5995;
+        let currentLng = 120.9842;
+        let routingControl = null;
+        let finalDestLatLng = null;
+        let hasSpokenArrival = false;
+        let currentBearing = 0;
+
+        // Battery State
+        let batInitialPercentage = 100;
+        let accumulatedDistanceSinceSet = 0;
+
+        // Voice API Wrapper
+        function speak(text) {
+            if (!window.speechSynthesis) return;
+            window.speechSynthesis.cancel(); // clear queue
+            const msg = new SpeechSynthesisUtterance(text);
+            msg.lang = 'en-US';
+            msg.rate = 1.0;
+            window.speechSynthesis.speak(msg);
+        }
+
+        // Top Banner Updater
+        function updateBanner(text, bgColor = 'bg-gray-800', textColor = 'text-white') {
+            const banner = document.getElementById('nav-banner');
+            const navText = document.getElementById('nav-text');
+            // Remove old colors
+            banner.className = banner.className.replace(/bg-\w+-\d+/g, '').replace(/text-\w+-\d+/g, '');
+            // Add new colors
+            banner.classList.add(bgColor, textColor);
+            navText.innerText = text;
+        }
+
+        // Battery Logic
+        const batInput = document.getElementById('battery-input');
+        
+        function calculateBattery() {
+            // 100% = 30km -> 1% = 0.3km
+            let maxRangeAtInput = batInitialPercentage * 0.3;
+            let currentRange = maxRangeAtInput - accumulatedDistanceSinceSet;
+            
+            if (currentRange < 0) currentRange = 0;
+            
+            let currentPct = (currentRange / 0.3);
+            
+            // Update UI
+            batInput.value = currentPct.toFixed(0);
+            document.getElementById('est-range').innerText = currentRange.toFixed(1);
+            
+            // Bar Color & Width
+            let bar = document.getElementById('battery-bar-fill');
+            let widthPct = Math.min(100, Math.max(0, currentPct));
+            bar.style.width = widthPct + "%";
+            
+            if (widthPct <= 20) bar.style.backgroundColor = "#ef4444"; // red-500
+            else if (widthPct <= 50) bar.style.backgroundColor = "#f97316"; // orange-500
+            else bar.style.backgroundColor = "#22c55e"; // green-500
+        }
+
+        batInput.addEventListener('change', (e) => {
+            let val = parseFloat(e.target.value);
+            if(isNaN(val)) val = 0;
+            if(val > 100) val = 100;
+            if(val < 0) val = 0;
+            batInitialPercentage = val;
+            accumulatedDistanceSinceSet = 0; // Reset physical drain tracker
+            e.target.value = val;
+            calculateBattery();
+        });
+
+        // Trip Reset function (Does not magically refill battery, only resets the display meter)
+        window.resetTrip = function() {
+            totalDistance = 0;
+            document.getElementById('distance').innerText = "0.00";
+            speak("Trip meter reset.");
+        };
+
+        // Math Helpers
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; 
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c; // in km
+        }
+
+        function calculateBearing(startLat, startLng, destLat, destLng) {
+            const startLatRad = startLat * Math.PI / 180;
+            const startLngRad = startLng * Math.PI / 180;
+            const destLatRad = destLat * Math.PI / 180;
+            const destLngRad = destLng * Math.PI / 180;
+
+            const y = Math.sin(destLngRad - startLngRad) * Math.cos(destLatRad);
+            const x = Math.cos(startLatRad) * Math.sin(destLatRad) - Math.sin(startLatRad) * Math.cos(destLatRad) * Math.cos(destLngRad - startLngRad);
+            let bearing = Math.atan2(y, x) * 180 / Math.PI;
+            return (bearing + 360) % 360;
+        }
+
+        // Smooth Animation Logic (Interpolation)
+        let animationFrameId;
+        function animateMarkerSmoothly(startLat, startLng, endLat, endLng, durationMs) {
+            const startTime = performance.now();
+            
+            function step(currentTime) {
+                let elapsed = currentTime - startTime;
+                let progress = elapsed / durationMs;
+                if (progress > 1) progress = 1;
+
+                // Linear interpolation
+                let lat = startLat + (endLat - startLat) * progress;
+                let lng = startLng + (endLng - startLng) * progress;
+                
+                marker.setLatLng([lat, lng]);
+                map.panTo([lat, lng], {animate: false}); // Keep map centered on marker frame by frame
+
+                if (progress < 1) {
+                    animationFrameId = requestAnimationFrame(step);
+                } else {
+                    currentLat = endLat;
+                    currentLng = endLng;
+                }
+            }
+            
+            if(animationFrameId) cancelAnimationFrame(animationFrameId);
+            animationFrameId = requestAnimationFrame(step);
+        }
+
+        // GPS Initialization & WakeLock
+        async function initGPS() {
+            try { await navigator.wakeLock.request('screen'); } catch (e) {}
+
+            if (navigator.geolocation) {
+                navigator.geolocation.watchPosition(position => {
+                    const newLat = position.coords.latitude;
+                    const newLng = position.coords.longitude;
+                    const speedMs = position.coords.speed || 0;
+                    const speedKmh = speedMs * 3.6;
+
+                    // Calculate rotation/bearing if moving significantly
+                    if (lastCoords && calculateDistance(lastCoords.lat, lastCoords.lng, newLat, newLng) > 0.001) {
+                        currentBearing = calculateBearing(lastCoords.lat, lastCoords.lng, newLat, newLng);
+                        const wrapper = document.getElementById('vehicle-wrapper');
+                        if (wrapper) wrapper.style.transform = `rotate(${currentBearing}deg)`;
+                    }
+
+                    // Animate marker from current position to new position over 1000ms
+                    if (!lastCoords) {
+                        marker.setLatLng([newLat, newLng]);
+                        map.setView([newLat, newLng], 18);
+                        currentLat = newLat; currentLng = newLng;
+                    } else {
+                        animateMarkerSmoothly(currentLat, currentLng, newLat, newLng, 1000);
+                    }
+
+                    // Dashboard Updates
+                    document.getElementById('speed').innerText = speedKmh.toFixed(0);
+                    const modeEl = document.getElementById('speed-mode');
+                    if (speedKmh < 1) { modeEl.innerText = "IDLE"; modeEl.className = "text-xl font-bold text-gray-500 tracking-wider"; }
+                    else if (speedKmh <= 29) { modeEl.innerText = "LOW"; modeEl.className = "text-xl font-bold text-green-400 tracking-wider"; }
+                    else if (speedKmh <= 39) { modeEl.innerText = "MED"; modeEl.className = "text-xl font-bold text-orange-400 tracking-wider"; }
+                    else { modeEl.innerText = "HIGH"; modeEl.className = "text-xl font-bold text-red-500 tracking-wider"; }
+
+                    // Distance & Battery accumulation
+                    if (lastCoords) {
+                        let deltaKm = calculateDistance(lastCoords.lat, lastCoords.lng, newLat, newLng);
+                        totalDistance += deltaKm;
+                        accumulatedDistanceSinceSet += deltaKm;
+                        document.getElementById('distance').innerText = totalDistance.toFixed(2);
+                        calculateBattery();
+                    }
+                    
+                    lastCoords = { lat: newLat, lng: newLng };
+
+                    // Routing Logic Updates
+                    if (routingControl) {
+                        // Dynamically update start point without redrawing entire route visually if possible,
+                        // but Leaflet Routing Machine recalculates. We handle it silently.
+                        routingControl.spliceWaypoints(0, 1, L.latLng(newLat, newLng));
+                    }
+
+                    // Destination proximity check
+                    if (finalDestLatLng) {
+                        let distToDest = calculateDistance(newLat, newLng, finalDestLatLng.lat, finalDestLatLng.lng);
+                        document.getElementById('dest-dist').innerText = distToDest.toFixed(2);
+                        
+                        if (distToDest <= 0.05 && !hasSpokenArrival) {
+                            updateBanner("Arriving at destination!", "bg-green-600", "text-white");
+                            speak("You are arriving at your destination.");
+                            hasSpokenArrival = true;
+                        }
+                    }
+
+                }, err => {
+                    updateBanner("GPS signal lost", "bg-red-600", "text-white");
+                }, { enableHighAccuracy: true, maximumAge: 0 });
+            }
+        }
+        initGPS();
+
+        // Routing Engine
+        function setRoute(destLat, destLng) {
+            updateBanner("Calculating route...", "bg-blue-600", "text-white");
+            if (routingControl) { map.removeControl(routingControl); }
+            
+            routingControl = L.Routing.control({
+                waypoints: [ L.latLng(currentLat, currentLng), L.latLng(destLat, destLng) ],
+                routeWhileDragging: false,
+                addWaypoints: false,
+                show: false, // Hide instruction panel
+                lineOptions: { styles: [{color: '#3b82f6', opacity: 0.8, weight: 6}] }, // Modern blue line
+                createMarker: function(i, wp) {
+                    if (i === 0) return null; // Hide start marker, keep our vehicle
+                    // Custom destination marker
+                    return L.marker(wp.latLng, {
+                        icon: L.divIcon({
+                            className: 'dest-marker',
+                            html: `<div style="background:#ef4444; width:16px; height:16px; border-radius:50%; border:3px solid white; box-shadow:0 0 10px rgba(0,0,0,0.5);"></div>`,
+                            iconSize: [16, 16]
+                        })
+                    });
+                }
+            }).on('routesfound', function(e) {
+                let coords = e.routes[0].coordinates;
+                finalDestLatLng = coords[coords.length - 1];
+                hasSpokenArrival = false;
+                
+                let distKm = (e.routes[0].summary.totalDistance / 1000).toFixed(1);
+                updateBanner(`Route found: ${distKm} KM`, "bg-blue-700", "text-white");
+                speak(`Route found. The destination is ${distKm} kilometers away.`);
+                
+                // Force hide default UI
+                setTimeout(() => {
+                    document.querySelectorAll('.leaflet-routing-container').forEach(el => el.style.display = 'none');
+                }, 100);
+            }).on('routingerror', function() {
+                updateBanner("Failed to calculate route.", "bg-red-600", "text-white");
+                speak("Failed to calculate route. Please check your internet connection.");
+            }).addTo(map);
+        }
+
+        // Click Map to Route
+        map.on('click', function(e) { setRoute(e.latlng.lat, e.latlng.lng); });
+
+        // Search API (Nominatim)
+        window.searchDestination = async function() {
+            const query = document.getElementById('dest-input').value;
+            if (!query) {
+                updateBanner("Please enter a destination", "bg-orange-500", "text-white");
+                speak("Please enter a destination.");
+                return; 
+            }
+            updateBanner("Searching...", "bg-gray-700", "text-white");
+            
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+                const data = await res.json();
+                if (data && data.length > 0) {
+                    setRoute(data[0].lat, data[0].lon);
+                    // Dismiss keyboard on mobile
+                    document.getElementById('dest-input').blur(); 
+                } else {
+                    updateBanner("Location not found", "bg-red-500", "text-white");
+                    speak("Location not found. Please try a different address.");
+                }
+            } catch (err) {
+                updateBanner("Search requires internet", "bg-red-500", "text-white");
+            }
+        }
+        
+        // Initial setup for battery based on HTML default value
+        calculateBattery();
+    </script>
 </body>
 </html>
