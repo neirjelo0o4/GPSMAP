@@ -3,45 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>E-Bike Navigation</title>
+    <title>E-Bike Smart Navigation</title>
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
     
     <style>
-        * { box-sizing: border-box; }
-        body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #000; overflow: hidden; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #e5e3df; overflow: hidden; }
         
-        /* HARDWARE ACCELERATED MAP */
-        #map { 
-            position: absolute; left: 0; top: 0; 
-            width: 100vw; height: 100vh; z-index: 1; 
-            transition: transform 1s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s ease-in-out;
-            will-change: transform, width;
-        }
+        /* 1. MAP FIX - No Black Borders during 3D Tilt */
+        #map-wrapper { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; overflow: hidden; z-index: 1; }
+        #map { position: absolute; width: 100%; height: 100%; transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1); will-change: transform; }
+        
+        /* The Magic Fix: Scale the map up when tilting so edges don't show */
+        .tilt-mode { transform: perspective(800px) rotateX(60deg) scale(1.8) translateY(15%); transform-origin: 50% 75%; }
+        
         .leaflet-routing-container { display: none !important; }
-        .vehicle-icon { transition: transform 0.3s linear; width: 45px; height: 45px; will-change: transform; }
+        .vehicle-icon { transition: transform 0.3s linear; width: 45px; height: 45px; will-change: transform; filter: drop-shadow(0 5px 5px rgba(0,0,0,0.5)); }
 
-        /* UI PANEL BASE (Invisible wrapper to manage clicks) */
+        /* Recenter Button (Google Maps Style) */
+        .recenter-btn { position: absolute; bottom: 35vh; right: 15px; width: 50px; height: 50px; background: white; border-radius: 50%; box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 1000; display: none; justify-content: center; align-items: center; cursor: pointer; border: none; outline: none; }
+        .recenter-btn svg { fill: #007aff; width: 24px; height: 24px; }
+
+        /* Floating UI wrapper */
         .ui-panel { position: absolute; z-index: 1000; pointer-events: none; transition: 0.3s ease; }
-        .ui-panel > * { pointer-events: auto; } /* Only UI elements are clickable */
+        .ui-panel > * { pointer-events: auto; }
 
-        /* COMMON COMPONENTS */
-        .nav-banner { background: #007aff; color: white; padding: 12px; text-align: center; font-weight: bold; border-radius: 12px; font-size: 0.9em; box-shadow: 0 4px 15px rgba(0,0,0,0.2); margin-bottom: 10px; transition: opacity 0.4s; }
-        
-        .search-container { display: flex; background: white; padding: 8px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: opacity 0.4s; }
+        /* Search & Autocomplete */
+        .top-section { display: flex; flex-direction: column; gap: 8px; width: 100%; position: relative; }
+        .nav-banner { background: #007aff; color: white; padding: 12px; text-align: center; font-weight: bold; border-radius: 12px; font-size: 0.9em; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: opacity 0.4s; }
+        .search-container { display: flex; background: white; padding: 8px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: opacity 0.4s; position: relative; }
         .search-container input { flex-grow: 1; padding: 10px; border: none; font-size: 1em; outline: none; border-radius: 10px; background: #f5f5f5; }
         .search-container button { margin-left: 8px; padding: 10px 15px; background: #007aff; color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; }
+        
+        /* Live Suggestions Dropdown */
+        .autocomplete-list { position: absolute; top: 110%; left: 0; right: 0; background: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); max-height: 250px; overflow-y: auto; display: none; z-index: 1001; flex-direction: column; }
+        .autocomplete-item { padding: 12px 15px; border-bottom: 1px solid #eee; font-size: 0.9em; cursor: pointer; display: flex; flex-direction: column; }
+        .autocomplete-item:hover { background: #f5f5f5; }
+        .autocomplete-item strong { color: #1c1c1e; }
+        .autocomplete-item small { color: #8e8e93; font-size: 0.8em; margin-top: 2px; }
 
+        /* Buttons & Dashboard */
         .start-btn { background: #007aff; color: white; border: none; padding: 15px 40px; border-radius: 30px; font-size: 1.2em; font-weight: 900; box-shadow: 0 10px 20px rgba(0,0,0,0.3); transition: 0.3s; cursor: pointer; display: none; margin: 0 auto 15px auto; width: fit-content; text-transform: uppercase; }
         .start-btn.active { background: #ff3b30; }
 
         .dashboard-grid { background: white; padding: 15px; border-radius: 20px; box-shadow: 0 -5px 25px rgba(0,0,0,0.15); display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .box { background: #f8f9fa; padding: 12px; border-radius: 15px; text-align: center; position: relative; display: flex; flex-direction: column; justify-content: center; }
-        
         .value { font-size: 1.8em; font-weight: 800; color: #1c1c1e; line-height: 1.1; }
         .label { font-size: 0.65em; color: #8e8e93; text-transform: uppercase; font-weight: 700; margin-top: 6px; }
-        
         .mode-idle { color: #8e8e93; } .mode-low { color: #34c759; } .mode-med { color: #ff9500; } .mode-high { color: #ff3b30; }
 
         .battery-section { grid-column: span 2; display: flex; flex-direction: column; gap: 8px; margin-top: 5px; }
@@ -51,46 +61,57 @@
         .battery-bar-fill { background: #34c759; height: 100%; width: 100%; transition: width 0.5s ease; }
         .btn-reset { position: absolute; top: 8px; right: 8px; background: none; border: 1px solid #ff3b30; color: #ff3b30; padding: 3px 6px; border-radius: 6px; font-size: 0.6em; font-weight: bold; cursor: pointer; }
 
-        /* ========================================= */
-        /* PORTRAIT MODE (Nakakatayo ang phone)      */
-        /* ========================================= */
+        /* ==================== RESPONSIVE LAYOUTS ==================== */
+        
+        /* PORTRAIT MODE */
         @media screen and (orientation: portrait) {
             .ui-panel { top: 0; left: 0; width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: space-between; padding: 15px; padding-bottom: 25px; }
             .bottom-section { display: flex; flex-direction: column; align-items: stretch; }
-            /* 3D Tilt adjust para sa portrait */
-            .tilt-mode { transform: perspective(900px) rotateX(55deg); height: 150vh !important; top: -25vh !important; transform-origin: 50% 70%; }
         }
 
-        /* ========================================= */
-        /* LANDSCAPE MODE (Hating Screen / Grab UI)  */
-        /* ========================================= */
+        /* LANDSCAPE MODE (Split Screen + Scrollable Panel) */
         @media screen and (orientation: landscape) {
-            #map { width: 60vw; } /* 60% Map sa kaliwa */
+            #map-wrapper { width: 60vw; } 
             
-            .ui-panel { top: 0; right: 0; width: 40vw; height: 100vh; background: #f4f4f5; padding: 15px; display: flex; flex-direction: column; gap: 10px; pointer-events: auto; border-left: 1px solid #d1d1d6; box-shadow: -10px 0 30px rgba(0,0,0,0.15); overflow-y: auto; }
+            .ui-panel { 
+                top: 0; right: 0; width: 40vw; height: 100vh; 
+                background: #f4f4f5; padding: 15px; 
+                display: flex; flex-direction: column; gap: 10px; 
+                pointer-events: auto; border-left: 1px solid #d1d1d6; 
+                box-shadow: -10px 0 30px rgba(0,0,0,0.15); 
+                overflow-y: auto; /* THIS MAKES IT SCROLLABLE */
+            }
             
             .bottom-section { display: flex; flex-direction: column; flex-grow: 1; }
             .dashboard-grid { box-shadow: none; padding: 0; background: transparent; flex-grow: 1; align-content: start; }
             .box { border: 1px solid #e5e5ea; background: #fff; padding: 10px; }
-            .value { font-size: 1.5em; } /* Medyo liliitan ang text para kasya sa hati */
+            .value { font-size: 1.5em; } 
+            .start-btn { width: 100%; margin-top: auto; border-radius: 15px; padding: 15px; margin-bottom: 10px; }
+            .recenter-btn { bottom: 20px; right: 42vw; } /* Move recenter button to map area */
             
-            .start-btn { width: 100%; margin-top: auto; border-radius: 15px; padding: 15px; margin-bottom: 0; }
-            
-            /* 3D Tilt adjust para sa landscape (sentro sa screen) */
-            .tilt-mode { transform: perspective(800px) rotateX(50deg); height: 150vh !important; top: -25vh !important; transform-origin: 50% 50%; width: 60vw !important; }
+            .tilt-mode { transform: perspective(800px) rotateX(55deg) scale(1.8) translateY(5%); transform-origin: 50% 50%; }
         }
     </style>
 </head>
 <body>
 
-    <div id="map"></div>
+    <div id="map-wrapper">
+        <div id="map"></div>
+    </div>
+
+    <!-- RECENTER BUTTON -->
+    <button class="recenter-btn" id="recenter-btn" onclick="recenterMap()">
+        <svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+    </button>
 
     <div class="ui-panel">
         <div class="top-section" id="top-section">
             <div class="nav-banner" id="nav-banner" style="display: none;"></div>
             <div class="search-container" id="search-bar">
-                <input type="text" id="dest-input" placeholder="Search destination...">
-                <button onclick="searchDestination()">Route</button>
+                <input type="text" id="dest-input" placeholder="Search destination (e.g. Luneta)..." autocomplete="off">
+                <button onclick="triggerSearch()">Route</button>
+                <!-- Autocomplete Dropdown -->
+                <div class="autocomplete-list" id="autocomplete-list"></div>
             </div>
         </div>
 
@@ -130,6 +151,308 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
-    <script src="app.js"></script>
+    
+    <script>
+        // INIT MAP
+        const map = L.map('map', { zoomControl: false }).setView([14.5842, 121.1763], 17);
+        L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+            maxZoom: 20, attribution: '© Google Maps'
+        }).addTo(map);
+
+        // AUTO-RESIZE OBSERVER (Landscape/Portrait Switch Fix)
+        new ResizeObserver(() => map.invalidateSize()).observe(document.getElementById('map-wrapper'));
+
+        // PERMANENT SVG CAR
+        const carSVG = `
+        <svg width="45" height="45" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <rect x="25" y="15" width="50" height="70" rx="15" fill="#007aff" stroke="#ffffff" stroke-width="3"/>
+          <rect x="32" y="30" width="36" height="18" rx="4" fill="#1c1c1e"/>
+          <rect x="32" y="68" width="36" height="10" rx="3" fill="#1c1c1e"/>
+          <ellipse cx="34" cy="18" rx="4" ry="2" fill="#fff500"/>
+          <ellipse cx="66" cy="18" rx="4" ry="2" fill="#fff500"/>
+          <ellipse cx="34" cy="83" rx="4" ry="2" fill="#ff3b30"/>
+          <ellipse cx="66" cy="83" rx="4" ry="2" fill="#ff3b30"/>
+        </svg>`;
+        const vehicleIcon = L.divIcon({
+            html: `<div id="car-icon" style="transition: transform 0.3s linear;">${carSVG}</div>`,
+            className: '', iconSize: [45, 45], iconAnchor: [22, 22]
+        });
+
+        let marker = L.marker([14.5842, 121.1763], {icon: vehicleIcon, zIndexOffset: 1000}).addTo(map);
+
+        // APP STATE
+        let totalDistance = 0;
+        let lastCoords = null;
+        let currentLat = 14.5842;
+        let currentLng = 121.1763;
+        let currentHeading = 0; 
+        let routingControl = null;
+        let finalDestLatLng = null;
+        let spokenArrived = false;
+        let isNavigating = false; 
+        let isTrackingCamera = true; // Auto-pan state
+
+        // 1. FREE-PAN & RECENTER LOGIC
+        map.on('dragstart', () => {
+            isTrackingCamera = false; // Stop auto-panning when user drags
+            document.getElementById('recenter-btn').style.display = 'flex';
+        });
+
+        window.recenterMap = function() {
+            isTrackingCamera = true;
+            document.getElementById('recenter-btn').style.display = 'none';
+            map.panTo([currentLat, currentLng], {animate: true});
+        };
+
+        // 2. AUTOCOMPLETE SEARCH LOGIC (Google Style)
+        const destInput = document.getElementById('dest-input');
+        const autocompleteList = document.getElementById('autocomplete-list');
+        let searchTimeout;
+
+        destInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            const query = this.value;
+            if (query.length < 3) { autocompleteList.style.display = 'none'; return; }
+            
+            // Wait 500ms after user stops typing to fetch
+            searchTimeout = setTimeout(async () => {
+                try {
+                    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=ph&limit=5`);
+                    const data = await res.json();
+                    
+                    autocompleteList.innerHTML = '';
+                    if (data.length > 0) {
+                        data.forEach(item => {
+                            let nameParts = item.display_name.split(',');
+                            let mainText = nameParts[0];
+                            let subText = nameParts.slice(1).join(',').substring(0, 50) + '...';
+                            
+                            let div = document.createElement('div');
+                            div.className = 'autocomplete-item';
+                            div.innerHTML = `<strong>${mainText}</strong><small>${subText}</small>`;
+                            div.onclick = function() {
+                                destInput.value = mainText;
+                                autocompleteList.style.display = 'none';
+                                drawRoute(item.lat, item.lon);
+                                map.setView([item.lat, item.lon], 16);
+                            };
+                            autocompleteList.appendChild(div);
+                        });
+                        autocompleteList.style.display = 'flex';
+                    } else {
+                        autocompleteList.style.display = 'none';
+                    }
+                } catch (e) { console.log(e); }
+            }, 500);
+        });
+
+        // Hide list when clicking outside
+        document.addEventListener('click', (e) => {
+            if (e.target !== destInput && e.target !== autocompleteList) {
+                autocompleteList.style.display = 'none';
+            }
+        });
+
+        window.triggerSearch = async function() {
+            if(!destInput.value) return;
+            autocompleteList.style.display = 'none';
+            showBanner("Searching...");
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(destInput.value)}`);
+                const data = await res.json();
+                if (data && data.length > 0) drawRoute(data[0].lat, data[0].lon);
+                else showBanner("Location not found.");
+            } catch (err) { alert("Internet required."); }
+        }
+
+        // 3. MULTIPLE ROUTES & E-BIKE (NO TOLL) ROUTING
+        function drawRoute(destLat, destLng) {
+            if(routingControl != null) map.removeControl(routingControl);
+            showBanner("Finding best E-Bike routes...");
+            isTrackingCamera = true; // Recenter when new route
+            document.getElementById('recenter-btn').style.display = 'none';
+            
+            routingControl = L.Routing.control({
+                waypoints: [ L.latLng(currentLat, currentLng), L.latLng(destLat, destLng) ],
+                routeWhileDragging: false,
+                show: false,
+                // E-BIKE PROFILE: Uses openstreetmap's bike router which avoids expressways/tolls!
+                router: L.Routing.osrmv1({ serviceUrl: 'https://routing.openstreetmap.de/routed-bike/route/v1' }),
+                showAlternatives: true, // Show 2-3 alternate routes
+                altLineOptions: {
+                    styles: [
+                        {color: 'black', opacity: 0.15, weight: 10},
+                        {color: '#007aff', opacity: 0.3, weight: 7} // Malabong blue for alternates
+                    ]
+                },
+                lineOptions: { 
+                    styles: [
+                        {color: 'black', opacity: 0.15, weight: 10},
+                        {color: '#007aff', opacity: 1, weight: 7} // Malinaw na blue for main route
+                    ] 
+                },
+                createMarker: function(i, wp) {
+                    if (i === 0) return null; 
+                    return L.marker(wp.latLng); 
+                }
+            }).on('routesfound', function(e) {
+                let coords = e.routes[0].coordinates;
+                finalDestLatLng = coords[coords.length - 1]; 
+                spokenArrived = false;
+                
+                let distKm = (e.routes[0].summary.totalDistance / 1000).toFixed(2);
+                showBanner("Route selected: " + distKm + " KM (E-Bike safe)");
+                speak("Route selected. The destination is " + distKm + " kilometers away.");
+                
+                document.querySelectorAll('.leaflet-routing-container').forEach(el => el.style.display = 'none');
+                document.getElementById('start-btn').style.display = 'block';
+            }).addTo(map);
+        }
+
+        // 4. 3D NAVIGATION TOGGLE
+        window.toggleNavigation = function() {
+            const btn = document.getElementById('start-btn');
+            const mapEl = document.getElementById('map');
+            const searchBar = document.getElementById('search-bar');
+
+            if (!isNavigating) {
+                isNavigating = true;
+                btn.innerText = "EXIT NAVIGATION";
+                btn.classList.add('active');
+                searchBar.style.opacity = '0'; 
+                setTimeout(() => searchBar.style.display = 'none', 400);
+                
+                mapEl.classList.add('tilt-mode');
+                recenterMap(); // Auto follow
+                map.setZoom(19, {animate: true});
+                speak("Starting navigation.");
+            } else {
+                isNavigating = false;
+                btn.innerText = "START";
+                btn.classList.remove('active');
+                searchBar.style.display = 'flex';
+                setTimeout(() => searchBar.style.opacity = '1', 50);
+                
+                mapEl.classList.remove('tilt-mode');
+                map.setZoom(17, {animate: true});
+                speak("Navigation ended.");
+            }
+        }
+
+        // OTHER SYSTEMS (Battery, GPS, Voice)
+        window.speak = function(text) {
+            if (!window.speechSynthesis) return;
+            let msg = new SpeechSynthesisUtterance(text);
+            msg.lang = 'en-US'; 
+            window.speechSynthesis.speak(msg);
+        };
+
+        window.updateRange = function() {
+            let batInput = document.getElementById('battery-input');
+            if(!batInput) return;
+            let bat = parseFloat(batInput.value);
+            if (bat > 100) bat = 100; if (bat < 0) bat = 0;
+            
+            let maxRange = bat * 0.3;
+            let currentRange = maxRange - totalDistance; 
+            if (currentRange < 0) currentRange = 0;
+            
+            document.getElementById('est-range').innerText = currentRange.toFixed(1);
+            let percentLeft = maxRange > 0 ? (currentRange / maxRange) * 100 : 0;
+            let bar = document.getElementById('battery-bar-fill');
+            bar.style.width = percentLeft + "%";
+            
+            if (percentLeft <= 20) bar.style.background = "#ff3b30"; 
+            else if (percentLeft <= 50) bar.style.background = "#ff9500"; 
+            else bar.style.background = "#34c759";
+        };
+
+        window.resetTrip = function() {
+            let currentRange = parseFloat(document.getElementById('est-range').innerText);
+            let newBat = (currentRange / 0.3).toFixed(0);
+            document.getElementById('battery-input').value = newBat;
+            totalDistance = 0;
+            document.getElementById('distance').innerText = "0.00";
+            updateRange();
+        };
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; 
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+        }
+
+        function getBearing(lat1, lng1, lat2, lng2) {
+            const toRad = (deg) => deg * Math.PI / 180;
+            const toDeg = (rad) => rad * 180 / Math.PI;
+            const dLon = toRad(lng2 - lng1);
+            const y = Math.sin(dLon) * Math.cos(toRad(lat2));
+            const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) - Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
+            return (toDeg(Math.atan2(y, x)) + 360) % 360;
+        }
+
+        function showBanner(text) {
+            const banner = document.getElementById('nav-banner');
+            banner.innerText = text;
+            banner.style.display = 'block';
+        }
+
+        // GPS TRACKER
+        if (navigator.geolocation) {
+            navigator.geolocation.watchPosition(position => {
+                currentLat = position.coords.latitude;
+                currentLng = position.coords.longitude;
+                const speedKmh = position.coords.speed ? (position.coords.speed * 3.6) : 0; 
+                
+                const newLatLng = new L.LatLng(currentLat, currentLng);
+                marker.setLatLng(newLatLng);
+                
+                // ONLY PAN if user isn't free-dragging the map
+                if(isTrackingCamera) {
+                    map.panTo(newLatLng, {animate: true, duration: 0.5});
+                }
+
+                if (lastCoords && speedKmh > 1) { 
+                    if (position.coords.heading !== null && !isNaN(position.coords.heading)) {
+                        currentHeading = position.coords.heading;
+                    } else {
+                        currentHeading = getBearing(lastCoords.lat, lastCoords.lng, currentLat, currentLng);
+                    }
+                    const carEl = document.getElementById('car-icon');
+                    if(carEl) carEl.style.transform = `rotate(${currentHeading}deg)`;
+                }
+
+                document.getElementById('speed').innerText = speedKmh.toFixed(1);
+                const modeEl = document.getElementById('speed-mode');
+                modeEl.className = "value";
+                if (speedKmh == 0) { modeEl.innerText = "IDLE"; modeEl.classList.add("mode-idle"); }
+                else if (speedKmh <= 29) { modeEl.innerText = "LOW"; modeEl.classList.add("mode-low"); }
+                else if (speedKmh <= 39) { modeEl.innerText = "MEDIUM"; modeEl.classList.add("mode-med"); }
+                else { modeEl.innerText = "HIGH"; modeEl.classList.add("mode-high"); }
+
+                if (lastCoords) {
+                    let moved = calculateDistance(lastCoords.lat, lastCoords.lng, currentLat, currentLng);
+                    totalDistance += moved;
+                    document.getElementById('distance').innerText = totalDistance.toFixed(2);
+                    updateRange(); 
+                }
+                lastCoords = { lat: currentLat, lng: currentLng };
+
+                if (finalDestLatLng) {
+                    let distToDest = calculateDistance(currentLat, currentLng, finalDestLatLng.lat, finalDestLatLng.lng);
+                    document.getElementById('dest-dist').innerText = distToDest.toFixed(2);
+                    
+                    if (distToDest <= 0.05 && !spokenArrived) {
+                        showBanner("You have arrived!");
+                        speak("You have arrived at your destination.");
+                        spokenArrived = true;
+                        if(isNavigating) toggleNavigation();
+                    }
+                }
+            }, error => console.error(error), { enableHighAccuracy: true, maximumAge: 0 });
+        }
+    </script>
 </body>
 </html>
