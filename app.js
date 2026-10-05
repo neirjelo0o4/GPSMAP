@@ -1,11 +1,11 @@
-// DIRECT GOOGLE MAPS SERVER - No API Key required, exact Google Maps look
+// Clean Modern Map (Grab / Google Maps style)
 const map = L.map('map', { zoomControl: false }).setView([14.6204, 121.1714], 18);
-L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
     maxZoom: 20,
-    attribution: '© Google Maps'
+    attribution: '© OpenStreetMap'
 }).addTo(map);
 
-// Modern Top-View Car Icon allowing CSS rotation
+// Modern Top-View Car Icon
 const vehicleIcon = L.divIcon({
     html: '<img src="https://cdn-icons-png.flaticon.com/512/3350/3350383.png" class="vehicle-icon" id="car-icon">',
     className: '',
@@ -32,28 +32,12 @@ async function requestWakeLock() {
 }
 requestWakeLock();
 
-// -- ENGLISH VOICE FIX --
-// I-load agad ang mga boses sa background para handa na
-window.speechSynthesis.getVoices();
-if (speechSynthesis.onvoiceschanged !== undefined) {
-    speechSynthesis.onvoiceschanged = function() {
-        window.speechSynthesis.getVoices();
-    };
-}
-
+// -- STRICT ENGLISH VOICE --
 window.speak = function(text) {
     if (!window.speechSynthesis) return;
     let msg = new SpeechSynthesisUtterance(text);
-    
-    // Hanapin nang pilit ang English voice sa phone system
-    let voices = window.speechSynthesis.getVoices();
-    let englishVoice = voices.find(v => v.lang.includes('en-US') || v.lang.includes('en-GB') || v.name.toLowerCase().includes('english'));
-    
-    if (englishVoice) {
-        msg.voice = englishVoice;
-    }
-    
-    msg.lang = 'en-US';
+    msg.lang = 'en-US'; // Strict English
+    msg.rate = 1.0;
     window.speechSynthesis.speak(msg);
 };
 
@@ -74,16 +58,9 @@ window.updateRange = function() {
     let bar = document.getElementById('battery-bar-fill');
     bar.style.width = percentLeft + "%";
     
-    if (percentLeft <= 20) {
-        bar.style.background = "#ff4c4c"; 
-        bar.style.boxShadow = "0 0 10px #ff4c4c";
-    } else if (percentLeft <= 50) {
-        bar.style.background = "#ffea00"; 
-        bar.style.boxShadow = "0 0 10px #ffea00";
-    } else {
-        bar.style.background = "#00e5ff"; 
-        bar.style.boxShadow = "0 0 10px #00e5ff";
-    }
+    if (percentLeft <= 20) { bar.style.background = "#ff3b30"; } 
+    else if (percentLeft <= 50) { bar.style.background = "#ff9500"; } 
+    else { bar.style.background = "#34c759"; }
 };
 
 window.resetTrip = function() {
@@ -100,19 +77,22 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
     const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
+    return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
 }
 
-// Calculate Bearing to rotate the car
 function getBearing(lat1, lng1, lat2, lng2) {
     const toRad = (deg) => deg * Math.PI / 180;
     const toDeg = (rad) => rad * 180 / Math.PI;
     const dLon = toRad(lng2 - lng1);
     const y = Math.sin(dLon) * Math.cos(toRad(lat2));
     const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) - Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
-    let brng = toDeg(Math.atan2(y, x));
-    return (brng + 360) % 360;
+    return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+
+function showBanner(text) {
+    const banner = document.getElementById('nav-banner');
+    banner.innerText = text;
+    banner.style.display = 'block';
 }
 
 // GPS Tracking Live Updates
@@ -124,9 +104,11 @@ if (navigator.geolocation) {
         
         const newLatLng = new L.LatLng(currentLat, currentLng);
         marker.setLatLng(newLatLng);
-        map.panTo(newLatLng);
+        
+        // Offset the map slightly so the car is at the lower part of the screen (like Grab)
+        map.panTo(newLatLng, {animate: true});
 
-        // Rotation Logic (Umiikot kapag umaandar)
+        // Rotation Logic (Rotates car when moving)
         if (lastCoords && speedKmh > 1) { 
             if (position.coords.heading !== null && !isNaN(position.coords.heading)) {
                 currentHeading = position.coords.heading;
@@ -139,10 +121,13 @@ if (navigator.geolocation) {
 
         document.getElementById('speed').innerText = speedKmh.toFixed(1);
         const modeEl = document.getElementById('speed-mode');
-        if (speedKmh == 0) { modeEl.innerText = "IDLE"; modeEl.style.color = "#aaa"; }
-        else if (speedKmh <= 29) { modeEl.innerText = "LOW"; modeEl.style.color = "#00e5ff"; }
-        else if (speedKmh <= 39) { modeEl.innerText = "MEDIUM"; modeEl.style.color = "#ffea00"; }
-        else { modeEl.innerText = "HIGH"; modeEl.style.color = "#ff4c4c"; }
+        
+        // Reset mode classes
+        modeEl.className = "value";
+        if (speedKmh == 0) { modeEl.innerText = "IDLE"; modeEl.classList.add("mode-idle"); }
+        else if (speedKmh <= 29) { modeEl.innerText = "LOW"; modeEl.classList.add("mode-low"); }
+        else if (speedKmh <= 39) { modeEl.innerText = "MEDIUM"; modeEl.classList.add("mode-med"); }
+        else { modeEl.innerText = "HIGH"; modeEl.classList.add("mode-high"); }
 
         if (lastCoords) {
             let moved = calculateDistance(lastCoords.lat, lastCoords.lng, currentLat, currentLng);
@@ -157,8 +142,7 @@ if (navigator.geolocation) {
             document.getElementById('dest-dist').innerText = distToDest.toFixed(2);
             
             if (distToDest <= 0.05 && !spokenArrived) {
-                document.getElementById('nav-banner').innerText = "YOU HAVE ARRIVED!";
-                document.getElementById('nav-banner').style.background = "rgba(0, 229, 255, 0.5)";
+                showBanner("You have arrived!");
                 speak("You have arrived at your destination.");
                 spokenArrived = true;
             }
@@ -168,16 +152,20 @@ if (navigator.geolocation) {
 
 function drawRoute(destLat, destLng) {
     if(routingControl != null) { map.removeControl(routingControl); }
-    document.getElementById('nav-banner').innerText = "Calculating route...";
+    showBanner("Calculating route...");
     
     routingControl = L.Routing.control({
         waypoints: [ L.latLng(currentLat, currentLng), L.latLng(destLat, destLng) ],
         routeWhileDragging: false,
         addWaypoints: false,
-        show: false, 
+        show: false,
+        // Thick Google Maps style Blue Line
+        lineOptions: {
+            styles: [{color: '#007aff', opacity: 0.8, weight: 7}]
+        },
         createMarker: function(i, wp) {
-            if (i === 0) return null; 
-            return L.marker(wp.latLng); 
+            if (i === 0) return null; // Keep car icon
+            return L.marker(wp.latLng); // Dest Pin
         }
     }).on('routesfound', function(e) {
         let coords = e.routes[0].coordinates;
@@ -185,11 +173,11 @@ function drawRoute(destLat, destLng) {
         spokenArrived = false;
         
         let distKm = (e.routes[0].summary.totalDistance / 1000).toFixed(2);
-        document.getElementById('nav-banner').innerText = "Route found. " + distKm + " KM away";
+        showBanner("Route found. " + distKm + " KM away");
         speak("Route found. The destination is " + distKm + " kilometers away.");
         
         document.querySelectorAll('.leaflet-routing-container').forEach(el => el.style.display = 'none');
-        map.setZoom(18);
+        map.setZoom(17);
     }).addTo(map);
 }
 
@@ -198,7 +186,7 @@ map.on('click', function(e) { drawRoute(e.latlng.lat, e.latlng.lng); });
 window.searchDestination = async function() {
     const query = document.getElementById('dest-input').value;
     if (!query) { alert("Please type a destination."); return; }
-    document.getElementById('nav-banner').innerText = "Searching...";
+    showBanner("Searching...");
     
     try {
         const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
@@ -207,10 +195,10 @@ window.searchDestination = async function() {
             drawRoute(data[0].lat, data[0].lon);
             map.setView([data[0].lat, data[0].lon], 16);
         } else {
-            alert("Location not found. Please try a more specific address.");
-            document.getElementById('nav-banner').innerText = "Search or tap a destination to start";
+            alert("Location not found.");
+            document.getElementById('nav-banner').style.display = 'none';
         }
     } catch (err) {
-        alert("Internet connection required to search addresses.");
+        alert("Internet connection required.");
     }
 }
