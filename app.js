@@ -1,43 +1,87 @@
-// Clean Modern Map (Grab / Google Maps style)
-const map = L.map('map', { zoomControl: false }).setView([14.6204, 121.1714], 18);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+// Google Maps Server
+const map = L.map('map', { zoomControl: false }).setView([14.5842, 121.1763], 17);
+L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
     maxZoom: 20,
-    attribution: '© OpenStreetMap'
+    attribution: '© Google Maps'
 }).addTo(map);
 
-// Modern Top-View Car Icon
+// ADVANCED: Auto-resize map properly when phone rotates from Portrait to Landscape
+const resizeObserver = new ResizeObserver(() => {
+    map.invalidateSize();
+});
+resizeObserver.observe(document.getElementById('map'));
+
+// PERMANENT CAR ICON (Pure SVG)
+const carSVG = `
+<svg width="45" height="45" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <rect x="25" y="15" width="50" height="70" rx="15" fill="#007aff" stroke="#ffffff" stroke-width="3"/>
+  <rect x="32" y="30" width="36" height="18" rx="4" fill="#1c1c1e"/>
+  <rect x="32" y="68" width="36" height="10" rx="3" fill="#1c1c1e"/>
+  <ellipse cx="34" cy="18" rx="4" ry="2" fill="#fff500"/>
+  <ellipse cx="66" cy="18" rx="4" ry="2" fill="#fff500"/>
+  <ellipse cx="34" cy="83" rx="4" ry="2" fill="#ff3b30"/>
+  <ellipse cx="66" cy="83" rx="4" ry="2" fill="#ff3b30"/>
+</svg>`;
+
 const vehicleIcon = L.divIcon({
-    html: '<img src="https://cdn-icons-png.flaticon.com/512/3350/3350383.png" class="vehicle-icon" id="car-icon">',
+    html: `<div id="car-icon" style="transition: transform 0.3s linear;">${carSVG}</div>`,
     className: '',
     iconSize: [45, 45],
     iconAnchor: [22, 22]
 });
 
-let marker = L.marker([14.6204, 121.1714], {icon: vehicleIcon}).addTo(map);
+let marker = L.marker([14.5842, 121.1763], {icon: vehicleIcon}).addTo(map);
 
 let totalDistance = 0;
 let lastCoords = null;
-let currentLat = 14.6204;
-let currentLng = 121.1714;
+let currentLat = 14.5842;
+let currentLng = 121.1763;
 let currentHeading = 0; 
 let routingControl = null;
 let finalDestLatLng = null;
 let spokenArrived = false;
+let isNavigating = false; 
 
-// Screen Wake Lock
-let wakeLock = null;
-async function requestWakeLock() {
-    try { wakeLock = await navigator.wakeLock.request('screen'); } 
-    catch (err) { console.log('Wake Lock error:', err); }
+// Navigation 3D Toggle
+window.toggleNavigation = function() {
+    const btn = document.getElementById('start-btn');
+    const mapDiv = document.getElementById('map');
+    const searchBar = document.getElementById('search-bar');
+
+    if (!isNavigating) {
+        isNavigating = true;
+        btn.innerText = "EXIT NAVIGATION";
+        btn.classList.add('active');
+        
+        // Hide Search bar smoothly
+        searchBar.style.opacity = '0'; 
+        setTimeout(() => searchBar.style.display = 'none', 400);
+        
+        // 3D Tilt Map
+        mapDiv.classList.add('tilt-mode');
+        map.setZoom(19, {animate: true});
+        speak("Starting navigation.");
+    } else {
+        isNavigating = false;
+        btn.innerText = "START";
+        btn.classList.remove('active');
+        
+        // Show Search bar again
+        searchBar.style.display = 'flex';
+        setTimeout(() => searchBar.style.opacity = '1', 50);
+        
+        // Back to 2D Top View
+        mapDiv.classList.remove('tilt-mode');
+        map.setZoom(17, {animate: true});
+        speak("Navigation ended.");
+    }
 }
-requestWakeLock();
 
-// -- STRICT ENGLISH VOICE --
+// Strict English Voice
 window.speak = function(text) {
     if (!window.speechSynthesis) return;
     let msg = new SpeechSynthesisUtterance(text);
-    msg.lang = 'en-US'; // Strict English
-    msg.rate = 1.0;
+    msg.lang = 'en-US'; 
     window.speechSynthesis.speak(msg);
 };
 
@@ -105,10 +149,9 @@ if (navigator.geolocation) {
         const newLatLng = new L.LatLng(currentLat, currentLng);
         marker.setLatLng(newLatLng);
         
-        // Offset the map slightly so the car is at the lower part of the screen (like Grab)
-        map.panTo(newLatLng, {animate: true});
+        // Pan dynamically
+        map.panTo(newLatLng, {animate: true, duration: 0.5});
 
-        // Rotation Logic (Rotates car when moving)
         if (lastCoords && speedKmh > 1) { 
             if (position.coords.heading !== null && !isNaN(position.coords.heading)) {
                 currentHeading = position.coords.heading;
@@ -122,7 +165,6 @@ if (navigator.geolocation) {
         document.getElementById('speed').innerText = speedKmh.toFixed(1);
         const modeEl = document.getElementById('speed-mode');
         
-        // Reset mode classes
         modeEl.className = "value";
         if (speedKmh == 0) { modeEl.innerText = "IDLE"; modeEl.classList.add("mode-idle"); }
         else if (speedKmh <= 29) { modeEl.innerText = "LOW"; modeEl.classList.add("mode-low"); }
@@ -145,6 +187,9 @@ if (navigator.geolocation) {
                 showBanner("You have arrived!");
                 speak("You have arrived at your destination.");
                 spokenArrived = true;
+                
+                // Auto Exit Navigation when arrived
+                if(isNavigating) toggleNavigation();
             }
         }
     }, error => console.error(error), { enableHighAccuracy: true, maximumAge: 0 });
@@ -159,13 +204,10 @@ function drawRoute(destLat, destLng) {
         routeWhileDragging: false,
         addWaypoints: false,
         show: false,
-        // Thick Google Maps style Blue Line
-        lineOptions: {
-            styles: [{color: '#007aff', opacity: 0.8, weight: 7}]
-        },
+        lineOptions: { styles: [{color: '#007aff', opacity: 0.8, weight: 7}] },
         createMarker: function(i, wp) {
-            if (i === 0) return null; // Keep car icon
-            return L.marker(wp.latLng); // Dest Pin
+            if (i === 0) return null; 
+            return L.marker(wp.latLng); 
         }
     }).on('routesfound', function(e) {
         let coords = e.routes[0].coordinates;
@@ -177,7 +219,10 @@ function drawRoute(destLat, destLng) {
         speak("Route found. The destination is " + distKm + " kilometers away.");
         
         document.querySelectorAll('.leaflet-routing-container').forEach(el => el.style.display = 'none');
-        map.setZoom(17);
+        
+        // SHOW START BUTTON NOW THAT ROUTE IS READY
+        document.getElementById('start-btn').style.display = 'block';
+        
     }).addTo(map);
 }
 
