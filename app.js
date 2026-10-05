@@ -1,26 +1,25 @@
-// FREE Dark Map Base - No API Key required
-const map = L.map('map', { zoomControl: false }).setView([14.5995, 120.9842], 18);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    maxZoom: 19,
-    attribution: '© OpenStreetMap & CartoDB'
+// DIRECT GOOGLE MAPS SERVER - No API Key required, exact Google Maps look
+const map = L.map('map', { zoomControl: false }).setView([14.6204, 121.1714], 18);
+L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+    maxZoom: 20,
+    attribution: '© Google Maps'
 }).addTo(map);
 
 // Modern Top-View Car Icon allowing CSS rotation
 const vehicleIcon = L.divIcon({
-    // Gagamit tayo ng top-view na sasakyan
     html: '<img src="https://cdn-icons-png.flaticon.com/512/3350/3350383.png" class="vehicle-icon" id="car-icon">',
     className: '',
     iconSize: [45, 45],
     iconAnchor: [22, 22]
 });
 
-let marker = L.marker([14.5995, 120.9842], {icon: vehicleIcon}).addTo(map);
+let marker = L.marker([14.6204, 121.1714], {icon: vehicleIcon}).addTo(map);
 
 let totalDistance = 0;
 let lastCoords = null;
-let currentLat = 14.5995;
-let currentLng = 120.9842;
-let currentHeading = 0; // Para sa rotation ng sasakyan
+let currentLat = 14.6204;
+let currentLng = 121.1714;
+let currentHeading = 0; 
 let routingControl = null;
 let finalDestLatLng = null;
 let spokenArrived = false;
@@ -33,11 +32,28 @@ async function requestWakeLock() {
 }
 requestWakeLock();
 
-// English Voice Over API
+// -- ENGLISH VOICE FIX --
+// I-load agad ang mga boses sa background para handa na
+window.speechSynthesis.getVoices();
+if (speechSynthesis.onvoiceschanged !== undefined) {
+    speechSynthesis.onvoiceschanged = function() {
+        window.speechSynthesis.getVoices();
+    };
+}
+
 window.speak = function(text) {
     if (!window.speechSynthesis) return;
     let msg = new SpeechSynthesisUtterance(text);
-    msg.lang = 'en-US'; // Naka-set sa English Accent
+    
+    // Hanapin nang pilit ang English voice sa phone system
+    let voices = window.speechSynthesis.getVoices();
+    let englishVoice = voices.find(v => v.lang.includes('en-US') || v.lang.includes('en-GB') || v.name.toLowerCase().includes('english'));
+    
+    if (englishVoice) {
+        msg.voice = englishVoice;
+    }
+    
+    msg.lang = 'en-US';
     window.speechSynthesis.speak(msg);
 };
 
@@ -110,8 +126,8 @@ if (navigator.geolocation) {
         marker.setLatLng(newLatLng);
         map.panTo(newLatLng);
 
-        // Rotation Logic
-        if (lastCoords && speedKmh > 1) { // Aandar lang ang ikot kapag mabilis sa 1km/h
+        // Rotation Logic (Umiikot kapag umaandar)
+        if (lastCoords && speedKmh > 1) { 
             if (position.coords.heading !== null && !isNaN(position.coords.heading)) {
                 currentHeading = position.coords.heading;
             } else {
