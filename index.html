@@ -6,64 +6,87 @@
     <title>E-Bike Map & Dash</title>
     <link rel="manifest" href="manifest.json">
     
-    <!-- Leaflet CSS & Routing CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
     
     <style>
         body { margin: 0; font-family: Arial, sans-serif; background: #121212; color: white; display: flex; flex-direction: column; height: 100vh; }
-        .dashboard { padding: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #1e1e1e; z-index: 10; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-        .box { background: #2c2c2c; padding: 10px; border-radius: 8px; text-align: center; }
-        .value { font-size: 1.8em; font-weight: bold; color: #4caf50; }
-        .label { font-size: 0.75em; color: #aaa; text-transform: uppercase; margin-top: 5px; }
-        .mode { font-size: 1.2em; font-weight: bold; color: #ffeb3b; }
         
-        /* Search Box Styling */
+        /* Waze-like Navigation Banner */
+        .nav-banner { background: #1565C0; color: white; padding: 12px; text-align: center; font-weight: bold; font-size: 1.1em; z-index: 1000; box-shadow: 0 4px 5px rgba(0,0,0,0.3); border-bottom: 2px solid #0D47A1; }
+        
+        .dashboard { padding: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #1e1e1e; z-index: 10; }
+        .box { background: #2c2c2c; padding: 10px; border-radius: 8px; text-align: center; position: relative; }
+        .value { font-size: 1.8em; font-weight: bold; color: #4caf50; }
+        .label { font-size: 0.7em; color: #aaa; text-transform: uppercase; margin-top: 5px; letter-spacing: 1px; }
+        .mode { font-size: 1.2em; font-weight: bold; color: #ffeb3b; margin-top: 5px;}
+        
+        .btn-reset { position: absolute; top: 5px; right: 5px; background: #f44336; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 0.6em; font-weight: bold; cursor: pointer; }
+        
+        /* Battery & Bar */
+        input[type="number"] { width: 50px; font-size: 1em; background: #121212; color: white; border: 1px solid #4caf50; text-align: center; border-radius: 5px; padding: 3px; font-weight: bold;}
+        .battery-bar-container { background: #121212; height: 12px; width: 100%; border-radius: 6px; overflow: hidden; margin-top: 8px; border: 1px solid #555; }
+        .battery-bar-fill { background: #4caf50; height: 100%; width: 100%; transition: width 0.5s, background 0.5s; }
+
         .search-container { display: flex; padding: 10px; background: #1e1e1e; gap: 10px; z-index: 10; border-top: 1px solid #333; }
         .search-container input { flex-grow: 1; padding: 10px; border-radius: 5px; border: none; font-size: 1em; background: #2c2c2c; color: white; }
-        .search-container button { padding: 10px 15px; background: #4caf50; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; }
+        .search-container button { padding: 10px 15px; background: #1565C0; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; }
         
         #map { flex-grow: 1; width: 100%; }
-        
-        /* Battery Input Styling */
-        input[type="number"] { width: 60px; font-size: 1em; background: #121212; color: white; border: 1px solid #4caf50; text-align: center; border-radius: 5px; padding: 5px; font-weight: bold;}
-        
-        /* Hide Default Routing Text Box */
-        .leaflet-routing-container { display: none !important; }
+        .leaflet-routing-container { display: none !important; } /* Hide default text box */
     </style>
 </head>
 <body>
 
+    <div class="nav-banner" id="nav-banner">
+        Mag-search o mag-tap ng pupuntahan
+    </div>
+
     <div class="dashboard">
+        <!-- Speedometer -->
         <div class="box">
             <div class="value" id="speed">0</div>
             <div class="label">Speed (KM/H)</div>
         </div>
+        
+        <!-- Trip Meter w/ Reset -->
         <div class="box">
+            <button class="btn-reset" onclick="resetTrip()">RESET</button>
             <div class="value" id="distance">0.00</div>
             <div class="label">Trip (KM)</div>
         </div>
+        
+        <!-- Live Mode -->
         <div class="box">
             <div class="mode" id="speed-mode">IDLE</div>
-            <div class="label">Current Mode</div>
+            <div class="label">Mode</div>
         </div>
+        
+        <!-- Destination Distance -->
         <div class="box">
-            <div>
-                <input type="number" id="battery-input" value="100" max="100" min="0" oninput="updateRange()"> <span style="font-size: 1.2em; font-weight: bold;">%</span>
+            <div class="value" id="dest-dist" style="color: #00bcd4;">0.00</div>
+            <div class="label">To Dest (KM)</div>
+        </div>
+        
+        <!-- Battery Input & Bar -->
+        <div class="box" style="grid-column: span 2;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.9em; font-weight: bold; color: #aaa;">BAT: <input type="number" id="battery-input" value="100" max="100" min="0" oninput="updateRange()"> %</span>
+                <span style="color: #4caf50; font-weight: bold; font-size: 1.1em;">RANGE: <span id="est-range">30.0</span> KM</span>
             </div>
-            <div class="label" style="color: #4caf50;">Est. Range: <span id="est-range">30</span> KM</div>
+            <div class="battery-bar-container">
+                <div id="battery-bar-fill" class="battery-bar-fill"></div>
+            </div>
         </div>
     </div>
 
-    <!-- Search Box -->
     <div class="search-container">
-        <input type="text" id="dest-input" placeholder="Type destination (e.g. Luneta Park)">
+        <input type="text" id="dest-input" placeholder="Saan mo gusto pumunta?">
         <button onclick="searchDestination()">Route</button>
     </div>
 
     <div id="map"></div>
 
-    <!-- Leaflet JS & Routing JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
     <script src="app.js"></script>
