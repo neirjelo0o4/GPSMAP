@@ -1,12 +1,12 @@
-const map = L.map('map').setView([14.5995, 120.9842], 16);
+const map = L.map('map', { zoomControl: false }).setView([14.5995, 120.9842], 18);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '© OSM'
 }).addTo(map);
 
-// Custom E-Bike/Vehicle Icon
+// Vehicle Icon
 const vehicleIcon = L.icon({
-    iconUrl: 'https://cdn-icons-png.flaticon.com/512/2983/2983737.png', // Icon ng e-bike/scooter
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/2983/2983737.png',
     iconSize: [40, 40],
     iconAnchor: [20, 20]
 });
@@ -18,6 +18,8 @@ let lastCoords = null;
 let currentLat = 14.5995;
 let currentLng = 120.9842;
 let routingControl = null;
+let finalDestLatLng = null;
+let spokenArrived = false;
 
 // Screen Wake Lock
 let wakeLock = null;
@@ -27,16 +29,50 @@ async function requestWakeLock() {
 }
 requestWakeLock();
 
-// Battery Range Logic (100% = 30km, therefore 1% = 0.3km)
-window.updateRange = function() {
-    let bat = document.getElementById('battery-input').value;
-    if (bat > 100) bat = 100;
-    if (bat < 0) bat = 0;
-    let range = bat * 0.3; // 30km / 100
-    document.getElementById('est-range').innerText = range.toFixed(1);
-}
+// Voice Over Function
+window.speak = function(text) {
+    if (!window.speechSynthesis) return;
+    let msg = new SpeechSynthesisUtterance(text);
+    msg.lang = 'tl-PH'; // Tagalog accent kung supported ng phone
+    window.speechSynthesis.speak(msg);
+};
 
-// Distance Calculation
+// Battery & Live Range Logic
+window.updateRange = function() {
+    let batInput = document.getElementById('battery-input');
+    if(!batInput) return;
+    let bat = parseFloat(batInput.value);
+    if (bat > 100) bat = 100; if (bat < 0) bat = 0;
+    
+    // Computation: 100% = 30km (1% = 0.3km)
+    let maxRange = bat * 0.3;
+    let currentRange = maxRange - totalDistance; 
+    if (currentRange < 0) currentRange = 0;
+    
+    document.getElementById('est-range').innerText = currentRange.toFixed(1);
+    
+    // Update Visual Bar
+    let percentLeft = maxRange > 0 ? (currentRange / maxRange) * 100 : 0;
+    let bar = document.getElementById('battery-bar-fill');
+    bar.style.width = percentLeft + "%";
+    
+    if (percentLeft <= 20) bar.style.background = "#f44336"; // Red
+    else if (percentLeft <= 50) bar.style.background = "#ff9800"; // Orange
+    else bar.style.background = "#4caf50"; // Green
+};
+
+// Reset Trip Logic
+window.resetTrip = function() {
+    // Adjust Battery % so you don't lose the drained amount
+    let currentRange = parseFloat(document.getElementById('est-range').innerText);
+    let newBat = (currentRange / 0.3).toFixed(0);
+    document.getElementById('battery-input').value = newBat;
+    
+    totalDistance = 0;
+    document.getElementById('distance').innerText = "0.00";
+    updateRange();
+};
+
 function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371; 
     const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -53,12 +89,12 @@ if (navigator.geolocation) {
         currentLng = position.coords.longitude;
         const speedKmh = position.coords.speed ? (position.coords.speed * 3.6) : 0; 
         
-        // Update Map & Icon
+        // Update Marker & Zoom in Close
         const newLatLng = new L.LatLng(currentLat, currentLng);
         marker.setLatLng(newLatLng);
         map.panTo(newLatLng);
 
-        // Update Speedometer & Mode
+        // Update Live Speed & Mode Dynamically
         document.getElementById('speed').innerText = speedKmh.toFixed(1);
         const modeEl = document.getElementById('speed-mode');
         if (speedKmh == 0) { modeEl.innerText = "IDLE"; modeEl.style.color = "#aaa"; }
@@ -66,93 +102,85 @@ if (navigator.geolocation) {
         else if (speedKmh <= 39) { modeEl.innerText = "MEDIUM"; modeEl.style.color = "#ff9800"; }
         else { modeEl.innerText = "HIGH"; modeEl.style.color = "#f44336"; }
 
-        // Update Trip
+        // Update Trip & Live Battery Drop
         if (lastCoords) {
-            totalDistance += calculateDistance(lastCoords.lat, lastCoords.lng, currentLat, currentLng);
+            let moved = calculateDistance(lastCoords.lat, lastCoords.lng, currentLat, currentLng);
+            totalDistance += moved;
             document.getElementById('distance').innerText = totalDistance.toFixed(2);
-            
-            // Auto deduct distance from estimated battery range
-            let currentRange = parseFloat(document.getElementById('est-range').innerText);
-            let deductedRange = currentRange - calculateDistance(lastCoords.lat, lastCoords.lng, currentLat, currentLng);
-            if (deductedRange < 0) deductedRange = 0;
-            document.getElementById('est-range').innerText = deductedRange.toFixed(1);
+            updateRange(); // Auto compute bar & range text
         }
         lastCoords = { lat: currentLat, lng: currentLng };
 
-        // Update Routing Start Point kung may naka-set na destination
-        if(routingControl != null) {
-            routingControl.spliceWaypoints(0, 1, L.latLng(currentLat, currentLng));
+        // Check distance to destination live
+        if (finalDestLatLng) {
+            let distToDest = calculateDistance(currentLat, currentLng, finalDestLatLng.lat, finalDestLatLng.lng);
+            document.getElementById('dest-dist').innerText = distToDest.toFixed(2);
+            
+            // Voice Alarm when < 50 meters
+            if (distToDest <= 0.05 && !spokenArrived) {
+                document.getElementById('nav-banner').innerText = "MALAPIT KA NA!";
+                document.getElementById('nav-banner').style.background = "#4caf50";
+                speak("Malapit ka na sa iyong destinasyon.");
+                spokenArrived = true;
+            }
         }
 
     }, error => console.error(error), { enableHighAccuracy: true, maximumAge: 0 });
 }
 
-// Set Destination by Tapping on Map
-map.on('click', function(e) {
-    if(routingControl != null) {
-        map.removeControl(routingControl); // Tanggalin ang lumang ruta
-    }
+// Draw Route Logic
+function drawRoute(destLat, destLng) {
+    if(routingControl != null) { map.removeControl(routingControl); }
     
-    // Gumawa ng bagong ruta from Current Location to Tapped Location
     routingControl = L.Routing.control({
-        waypoints: [
-            L.latLng(currentLat, currentLng), 
-            L.latLng(e.latlng.lat, e.latlng.lng)
-        ],
+        waypoints: [ L.latLng(currentLat, currentLng), L.latLng(destLat, destLng) ],
         routeWhileDragging: false,
         addWaypoints: false,
-        createMarker: function(i, wp, nWps) {
-            if (i === 0) return null;
-            return L.marker(wp.latLng);
+        show: false, // Totally hide default routing box
+        createMarker: function(i, wp) {
+            if (i === 0) return null; // Keep our E-bike icon
+            return L.marker(wp.latLng); // Destination pin
         }
+    }).on('routesfound', function(e) {
+        let coords = e.routes[0].coordinates;
+        finalDestLatLng = coords[coords.length - 1]; // Exact finish line
+        spokenArrived = false;
+        
+        let distKm = (e.routes[0].summary.totalDistance / 1000).toFixed(2);
+        document.getElementById('nav-banner').innerText = "Ruta: " + distKm + " KM ang layo";
+        document.getElementById('nav-banner').style.background = "#1565C0";
+        
+        // Voice Over
+        speak("Nahanap na ang ruta. Ito ay " + distKm + " kilometro ang layo.");
+        
+        // Hide default leaflet boxes again to be safe
+        document.querySelectorAll('.leaflet-routing-container').forEach(el => el.style.display = 'none');
+        
+        // Zoom in nicely
+        map.setZoom(18);
     }).addTo(map);
-});
+}
 
-// Search Destination by Typing
+// Map Click Destination
+map.on('click', function(e) { drawRoute(e.latlng.lat, e.latlng.lng); });
+
+// Text Search Destination
 window.searchDestination = async function() {
     const query = document.getElementById('dest-input').value;
-    if (!query) {
-        alert("Mag-type muna ng pupuntahan.");
-        return;
-    }
-
+    if (!query) { alert("Mag-type ng pupuntahan."); return; }
+    document.getElementById('nav-banner').innerText = "Naghahanap...";
+    
     try {
-        // Libreng Search API ng OpenStreetMap
-        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
-        const data = await response.json();
-        
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+        const data = await res.json();
         if (data && data.length > 0) {
-            const destLat = data[0].lat;
-            const destLng = data[0].lon;
-            
-            if(routingControl != null) {
-                map.removeControl(routingControl);
-            }
-            
-            routingControl = L.Routing.control({
-                waypoints: [
-                    L.latLng(currentLat, currentLng), 
-                    L.latLng(destLat, destLng)
-                ],
-                routeWhileDragging: false,
-                addWaypoints: false,
-                createMarker: function(i, wp, nWps) {
-                    if (i === 0) return null; // Wag palitan ang E-Bike icon natin
-                    return L.marker(wp.latLng); // Simpleng pin para sa pupuntahan
-                }
-            }).addTo(map);
-
-            // I-zoom ang mapa para makita ang parehong Start at End point
-            map.fitBounds([
-                [currentLat, currentLng],
-                [destLat, destLng]
-            ]);
-
+            drawRoute(data[0].lat, data[0].lon);
+            map.setView([data[0].lat, data[0].lon], 16);
         } else {
-            alert("Hindi nahanap ang lokasyon. Subukan ang mas kumpletong address.");
+            alert("Hindi nahanap. Subukan ang mas malinaw na address.");
+            document.getElementById('nav-banner').innerText = "Mag-search o mag-tap ng pupuntahan";
         }
-    } catch (error) {
-        console.error("Geocoding error:", error);
-        alert("Kailangan ng internet para mag-search ng bagong lokasyon.");
+    } catch (err) {
+        alert("Kailangan ng internet pang-search ng address.");
     }
 }
