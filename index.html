@@ -17,12 +17,18 @@
         .value { font-size: 1.8em; font-weight: bold; color: #4caf50; }
         .label { font-size: 0.75em; color: #aaa; text-transform: uppercase; margin-top: 5px; }
         .mode { font-size: 1.2em; font-weight: bold; color: #ffeb3b; }
+        
+        /* Search Box Styling */
+        .search-container { display: flex; padding: 10px; background: #1e1e1e; gap: 10px; z-index: 10; border-top: 1px solid #333; }
+        .search-container input { flex-grow: 1; padding: 10px; border-radius: 5px; border: none; font-size: 1em; background: #2c2c2c; color: white; }
+        .search-container button { padding: 10px 15px; background: #4caf50; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; }
+        
         #map { flex-grow: 1; width: 100%; }
         
         /* Battery Input Styling */
         input[type="number"] { width: 60px; font-size: 1em; background: #121212; color: white; border: 1px solid #4caf50; text-align: center; border-radius: 5px; padding: 5px; font-weight: bold;}
         
-        /* Hide Default Routing Text Box para malinis tignan sa phone */
+        /* Hide Default Routing Text Box */
         .leaflet-routing-container { display: none !important; }
     </style>
 </head>
@@ -47,6 +53,12 @@
             </div>
             <div class="label" style="color: #4caf50;">Est. Range: <span id="est-range">30</span> KM</div>
         </div>
+    </div>
+
+    <!-- Search Box -->
+    <div class="search-container">
+        <input type="text" id="dest-input" placeholder="Type destination (e.g. Luneta Park)">
+        <button onclick="searchDestination()">Route</button>
     </div>
 
     <div id="map"></div>
