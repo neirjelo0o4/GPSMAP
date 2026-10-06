@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>E-Bike Nav Pro - Route Breakdown Analysis</title>
+    <title>E-Bike Nav Pro - Smart UI & Advanced Search</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
@@ -18,92 +18,102 @@
         .leaflet-routing-container { display: none !important; }
         
         /* SEARCH PANEL */
-        .search-panel { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 350px; z-index: 1005; background: white; border-radius: 15px; box-shadow: 0 8px 25px rgba(0,0,0,0.4); padding: 10px; transition: 0.3s; }
+        .search-panel { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); width: 92%; max-width: 400px; z-index: 1005; background: white; border-radius: 15px; box-shadow: 0 8px 25px rgba(0,0,0,0.4); padding: 12px; transition: 0.3s; }
         .search-panel.hidden { transform: translate(-50%, -150%); opacity: 0; pointer-events: none; }
         
-        .stops-wrapper { max-height: 35vh; overflow-y: auto; padding-right: 5px; } 
+        .stops-wrapper { max-height: 40vh; overflow-y: auto; padding-right: 5px; } 
         
         .input-row { display: flex; align-items: center; padding: 8px 5px; border-bottom: 1px solid #eee; position: relative; }
         .input-row:last-child { border-bottom: none; }
-        .input-row i.loc-icon { color: #1a73e8; margin-right: 10px; font-size: 20px; }
-        .input-row i.remove-icon { color: #aaa; cursor: pointer; font-size: 20px; margin-left: 5px; }
+        .input-row i.loc-icon { color: #1a73e8; margin-right: 12px; font-size: 22px; }
+        .input-row i.remove-icon { color: #aaa; cursor: pointer; font-size: 22px; margin-left: 5px; transition: 0.2s; }
         .input-row i.remove-icon:hover { color: #ea4335; }
-        .input-row input { border: none; font-size: 14px; font-weight: bold; outline: none; width: 100%; background: transparent; color: #444; }
+        .input-row input { border: none; font-size: 15px; font-weight: 700; outline: none; width: 100%; background: transparent; color: #444; }
+        .input-row input::placeholder { color: #999; font-weight: 500; }
         
-        .action-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 5px 5px 5px; }
-        .btn-add-stop { background: none; border: none; color: #1a73e8; font-weight: 800; cursor: pointer; display: flex; align-items: center; font-size: 13px; padding: 5px; }
-        .btn-find-route { background: #1a73e8; color: white; border: none; border-radius: 20px; padding: 8px 15px; font-weight: 900; cursor: pointer; box-shadow: 0 2px 8px rgba(26,115,232,0.4); font-size: 13px; }
+        .action-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 5px 5px 5px; }
+        .btn-add-stop { background: none; border: none; color: #1a73e8; font-weight: 900; cursor: pointer; display: flex; align-items: center; font-size: 14px; padding: 5px; transition: 0.2s; }
+        .btn-add-stop:active { transform: scale(0.95); }
+        .btn-find-route { background: #1a73e8; color: white; border: none; border-radius: 25px; padding: 10px 20px; font-weight: 900; cursor: pointer; box-shadow: 0 4px 12px rgba(26,115,232,0.4); font-size: 14px; transition: 0.2s; }
+        .btn-find-route:active { transform: scale(0.95); }
         
         /* FIXED SUGGESTIONS BOX */
-        .suggestions { position: fixed; background: white; border-radius: 0 0 12px 12px; box-shadow: 0 8px 25px rgba(0,0,0,0.4); max-height: 250px; overflow-y: auto; z-index: 9999; display: none; }
-        .suggestion-item { padding: 12px 15px; display: flex; align-items: center; border-bottom: 1px solid #f1f3f4; cursor: pointer; font-size: 14px; }
-        .suggestion-item:hover { background: #f8f9fa; }
+        .suggestions { position: fixed; background: white; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); max-height: 280px; overflow-y: auto; z-index: 9999; display: none; margin-top: 5px; border: 1px solid #eee; }
+        .suggestion-item { padding: 15px 18px; display: flex; align-items: center; border-bottom: 1px solid #f1f3f4; cursor: pointer; font-size: 15px; transition: 0.2s; }
+        .suggestion-item:active { background: #f0f4f8; }
+        .search-loading { padding: 15px; text-align: center; color: #777; font-weight: bold; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 10px; }
         
-        /* E-BIKE DASHBOARD */
-        .ebike-dash { position: absolute; top: 120px; right: 15px; width: 180px; background: rgba(255, 255, 255, 0.85); border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); padding: 12px; z-index: 999; backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.6); transition: 0.3s; }
-        .dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
-        .dash-title { font-size: 13px; font-weight: 900; color: #444; text-transform: uppercase; letter-spacing: 1px; margin: 0; }
+        /* SMART E-BIKE DASHBOARD (AUTO-HIDES TO PREVENT OVERLAP) */
+        .ebike-dash { position: absolute; top: 130px; right: 15px; width: 190px; background: rgba(255, 255, 255, 0.9); border-radius: 15px; box-shadow: 0 8px 25px rgba(0,0,0,0.25); padding: 15px; z-index: 999; backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.8); transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1); }
+        .ebike-dash.smart-hidden { transform: translateX(120%) !important; opacity: 0; pointer-events: none; }
+        
+        .dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .dash-title { font-size: 14px; font-weight: 900; color: #333; text-transform: uppercase; letter-spacing: 1px; margin: 0; }
         
         .dash-controls { display: flex; gap: 8px; }
-        .info-btn { background: none; border: none; color: #1a73e8; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
-        .info-btn i { font-size: 20px; }
+        .info-btn { background: #f1f3f4; border: none; color: #1a73e8; border-radius: 50%; width: 28px; height: 28px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .info-btn i { font-size: 18px; }
         
         #dash-content { transition: max-height 0.3s ease; overflow: hidden; max-height: 500px; }
         
-        .dash-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; margin-top: 8px; font-size: 13px; font-weight: 800; color: #333; }
-        .dash-val { color: #1a73e8; font-size: 18px; font-weight: 900; }
+        .dash-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; margin-top: 10px; font-size: 14px; font-weight: 800; color: #444; }
+        .dash-val { color: #1a73e8; font-size: 20px; font-weight: 900; }
         .dash-val.red { color: #ea4335; }
         
-        .bat-input-group { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 11px; font-weight: 800; color: #222; }
-        .bat-input-group input { width: 50px; border: 1px solid rgba(26, 115, 232, 0.5); border-radius: 6px; padding: 4px; text-align: center; font-size: 13px; font-weight: 900; background: rgba(255,255,255,0.9); outline: none; }
+        .bat-input-group { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-size: 12px; font-weight: 800; color: #333; }
+        .bat-input-group input { width: 55px; border: 2px solid rgba(26, 115, 232, 0.3); border-radius: 6px; padding: 5px; text-align: center; font-size: 14px; font-weight: 900; background: rgba(255,255,255,1); outline: none; transition: 0.2s; }
+        .bat-input-group input:focus { border-color: #1a73e8; }
         
-        .btn-reset { width: 100%; background: rgba(234, 67, 53, 0.9); color: white; border: none; padding: 8px; border-radius: 8px; font-weight: 900; cursor: pointer; margin-top: 5px; text-transform: uppercase; font-size: 11px; transition: 0.2s; }
+        .btn-reset { width: 100%; background: #ea4335; color: white; border: none; padding: 10px; border-radius: 8px; font-weight: 900; cursor: pointer; margin-top: 8px; text-transform: uppercase; font-size: 12px; transition: 0.2s; box-shadow: 0 4px 10px rgba(234, 67, 53, 0.3); }
         .btn-reset:active { transform: scale(0.95); }
 
         /* BOTTOM ROUTE / START PANEL */
-        .bottom-panel { position: absolute; bottom: 0; left: 0; width: 100%; background: white; border-radius: 20px 20px 0 0; padding: 15px 20px; z-index: 1000; box-shadow: 0 -4px 20px rgba(0,0,0,0.2); transition: 0.3s; display: flex; flex-direction: column; gap: 10px; }
+        .bottom-panel { position: absolute; bottom: 0; left: 0; width: 100%; background: white; border-radius: 20px 20px 0 0; padding: 20px 20px 25px 20px; z-index: 1000; box-shadow: 0 -8px 25px rgba(0,0,0,0.15); transition: 0.4s cubic-bezier(0.25, 1, 0.5, 1); display: flex; flex-direction: column; gap: 12px; }
         .bottom-panel.hidden { transform: translateY(100%); }
-        .route-title { font-size: 20px; color: #188038; font-weight: 900; }
-        .route-desc { font-size: 12px; color: #555; font-weight: bold; }
+        .route-title { font-size: 22px; color: #188038; font-weight: 900; }
+        .route-desc { font-size: 13px; color: #555; font-weight: bold; }
         
-        .btn-start { background: #1a73e8; color: white; border: none; border-radius: 25px; padding: 12px; font-size: 16px; font-weight: 900; cursor: pointer; width: 100%; display: flex; justify-content: center; align-items: center; gap: 8px; box-shadow: 0 4px 10px rgba(26, 115, 232, 0.3); transition: 0.2s; }
-        .btn-start:active { transform: scale(0.98); }
-        .btn-stop { background: #ea4335; display: none; box-shadow: 0 4px 10px rgba(234, 67, 53, 0.3); }
+        .btn-start { background: #1a73e8; color: white; border: none; border-radius: 30px; padding: 16px; font-size: 18px; font-weight: 900; cursor: pointer; width: 100%; display: flex; justify-content: center; align-items: center; gap: 10px; box-shadow: 0 6px 15px rgba(26, 115, 232, 0.3); transition: 0.2s; }
+        .btn-start:active { transform: scale(0.96); }
+        .btn-stop { background: #ea4335; display: none; box-shadow: 0 6px 15px rgba(234, 67, 53, 0.3); }
 
         /* RECENTER BUTTON */
-        .btn-gps { position: absolute; bottom: 130px; left: 15px; width: 45px; height: 45px; background: white; border: none; border-radius: 50%; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; cursor: pointer; color: #1a73e8; z-index: 999; transition: 0.2s; }
+        .btn-gps { position: absolute; bottom: 140px; left: 15px; width: 50px; height: 50px; background: white; border: none; border-radius: 50%; box-shadow: 0 6px 15px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; cursor: pointer; color: #1a73e8; z-index: 999; transition: 0.2s; }
+        .btn-gps i { font-size: 26px; }
+        .btn-gps:active { transform: scale(0.9); }
         
         /* TURN BANNER */
-        .turn-banner { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 350px; background: #0b6050; color: white; border-radius: 12px; padding: 12px; z-index: 1001; box-shadow: 0 4px 15px rgba(0,0,0,0.3); display: none; align-items: center; opacity: 0; transition: 0.3s; }
-        .turn-banner i { font-size: 30px; margin-right: 15px; }
-        .turn-text { font-size: 18px; font-weight: 900; }
+        .turn-banner { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 350px; background: #0b6050; color: white; border-radius: 15px; padding: 15px 20px; z-index: 1001; box-shadow: 0 8px 25px rgba(0,0,0,0.4); display: none; align-items: center; opacity: 0; transition: 0.3s; }
+        .turn-banner i { font-size: 35px; margin-right: 18px; }
+        .turn-text { font-size: 20px; font-weight: 900; }
 
         /* MODALS */
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); z-index: 2000; display: none; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
-        .modal-box { background: white; padding: 20px; border-radius: 15px; width: 90%; max-width: 320px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
-        .modal-title { font-size: 16px; font-weight: 900; color: #1a73e8; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
-        .modal-input-group { margin-bottom: 15px; }
-        .modal-input-group label { display: block; font-size: 12px; font-weight: bold; color: #555; margin-bottom: 5px; }
-        .modal-input-group input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; }
-        .modal-btn { background: #1a73e8; color: white; border: none; padding: 10px; border-radius: 8px; width: 100%; font-weight: bold; cursor: pointer; }
-        .modal-btn.close { background: #ea4335; margin-top: 10px; }
-        .analysis-text { font-size: 14px; line-height: 1.5; font-weight: bold; color: #333; margin-bottom: 15px; }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); z-index: 2000; display: none; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
+        .modal-box { background: white; padding: 25px; border-radius: 20px; width: 90%; max-width: 340px; box-shadow: 0 15px 40px rgba(0,0,0,0.4); }
+        .modal-title { font-size: 18px; font-weight: 900; color: #1a73e8; margin-bottom: 18px; display: flex; align-items: center; gap: 10px; }
+        .modal-input-group { margin-bottom: 18px; }
+        .modal-input-group label { display: block; font-size: 13px; font-weight: 800; color: #444; margin-bottom: 8px; }
+        .modal-input-group input { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 10px; font-size: 15px; font-weight: bold; outline: none; transition: 0.2s; }
+        .modal-input-group input:focus { border-color: #1a73e8; }
+        .modal-btn { background: #1a73e8; color: white; border: none; padding: 12px; border-radius: 10px; width: 100%; font-size: 15px; font-weight: 900; cursor: pointer; box-shadow: 0 4px 12px rgba(26,115,232,0.3); }
+        .modal-btn.close { background: #f1f3f4; color: #333; margin-top: 12px; box-shadow: none; }
+        .analysis-text { font-size: 15px; line-height: 1.6; font-weight: bold; color: #333; margin-bottom: 18px; }
         .analysis-text.warning { color: #ea4335; }
 
-        .toast { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: white; padding: 12px 25px; border-radius: 30px; z-index: 2000; font-size: 14px; font-weight: bold; display: none; }
+        .toast { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.85); color: white; padding: 15px 30px; border-radius: 30px; z-index: 2000; font-size: 15px; font-weight: bold; display: none; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
         .direction-marker { transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1); transform-origin: center center; }
 
         /* CUSTOM MAP MARKERS FOR STOPS */
-        .stop-marker { padding: 5px 12px; border-radius: 15px; font-weight: 900; font-size: 12px; border: 2px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.4); white-space: nowrap; transform: translate(-50%, -100%); margin-top: -5px; display: inline-block; }
+        .stop-marker { padding: 6px 14px; border-radius: 20px; font-weight: 900; font-size: 13px; border: 3px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.5); white-space: nowrap; transform: translate(-50%, -100%); margin-top: -5px; display: inline-block; }
         .stop-intermediate { background-color: #fbbc04; color: #111; }
         .stop-final { background-color: #ea4335; color: white; }
 
         /* LANDSCAPE FIX */
         @media (orientation: landscape) {
-            .search-panel { top: 15px; left: 15px; transform: none; width: 320px; }
+            .search-panel { top: 15px; left: 15px; transform: none; width: 340px; max-height: 85vh; }
             .search-panel.hidden { transform: translateY(-150%); }
             .ebike-dash { top: 15px; right: 15px; left: auto; }
-            .bottom-panel { width: 320px; left: 15px; right: auto; bottom: 15px; border-radius: 15px; padding: 15px; }
+            .bottom-panel { width: 340px; left: 15px; right: auto; bottom: 15px; border-radius: 15px; padding: 15px; }
             .btn-gps { right: 15px; bottom: 20px; left: auto; }
             .turn-banner { top: 15px; left: 50%; transform: translateX(-50%); }
         }
@@ -111,37 +121,38 @@
 </head>
 <body>
 
-    <div class="toast" id="toast">Locating...</div>
+    <div class="toast" id="toast">Kumukuha ng GPS...</div>
     
     <div id="map-wrapper">
         <div id="map"></div>
     </div>
 
+    <!-- NAKAHIWALAY NA SUGGESTIONS BOX PARA DI MATAKPAN -->
     <div class="suggestions" id="suggestions-box"></div>
 
-    <!-- SEARCH PANEL MULTI-STOP WITH LEG-BY-LEG UI -->
+    <!-- SEARCH PANEL -->
     <div class="search-panel" id="search-panel">
         <div class="stops-wrapper" id="stops-wrapper">
             <div class="input-row">
                 <i class="material-icons loc-icon" style="color: #1a73e8;">my_location</i>
-                <input type="text" value="From: Your Location" readonly style="color: #1a73e8;">
+                <input type="text" value="From: Your Location" readonly style="color: #1a73e8; font-weight: 900;">
             </div>
             
             <div id="stops-container">
                 <div class="input-row stop-row" style="position: relative;">
                     <i class="material-icons loc-icon" style="color: #ea4335;">location_on</i>
-                    <input type="text" class="dest-input" placeholder="To: 1st Destination" oninput="handleSearchInput(this)" onfocus="handleSearchInput(this)" autocomplete="off">
+                    <input type="text" class="dest-input" placeholder="To: 1st Destination" oninput="handleSearchInput(this)" onfocus="activateSearchMode(this)" onblur="deactivateSearchMode()" autocomplete="off">
                 </div>
             </div>
         </div>
         
         <div class="action-row">
-            <button class="btn-add-stop" onclick="addStopInput()"><i class="material-icons" style="font-size:16px;">add</i> ADD STOP</button>
+            <button class="btn-add-stop" onclick="addStopInput()"><i class="material-icons" style="font-size:18px;">add_circle</i> ADD STOP</button>
             <button class="btn-find-route" onclick="calculateMultiStopRoute()">FIND ROUTE</button>
         </div>
     </div>
 
-    <!-- DASHBOARD -->
+    <!-- SMART DASHBOARD -->
     <div class="ebike-dash" id="ebike-dash">
         <div class="dash-header">
             <h3 class="dash-title">Dashboard</h3>
@@ -156,20 +167,20 @@
                 START BAT: 
                 <div><input type="number" id="battery-input" value="100" max="100" min="0" onchange="manualDataUpdate()"> %</div>
             </div>
-            <div class="bat-input-group" style="margin-bottom: 10px;">
+            <div class="bat-input-group" style="margin-bottom: 12px;">
                 MAX RANGE: 
                 <div><input type="number" id="max-range-input" value="30" min="1" onchange="manualDataUpdate()"> km</div>
             </div>
             
-            <hr style="border: 0; border-top: 1px solid rgba(0,0,0,0.1); margin: 8px 0;">
+            <hr style="border: 0; border-top: 2px solid rgba(0,0,0,0.08); margin: 10px 0;">
             
             <div class="dash-row">SPD: <span class="dash-val" id="disp-speed">0 <span style="font-size:12px;">km/h</span></span></div>
             <div class="dash-row">TRIP: <span class="dash-val" id="disp-trip">0.00</span></div>
             <div class="dash-row">LIVE BAT: <span class="dash-val" id="disp-bat">100%</span></div>
-            <div class="dash-row" style="font-size: 10px; justify-content: center; color: #555;">(Est. Range: <span id="disp-range">30.0</span> km)</div>
+            <div class="dash-row" style="font-size: 11px; justify-content: center; color: #666;">(Est. Range: <span id="disp-range">30.0</span> km)</div>
             
-            <button class="btn-reset" onclick="resetTripMeter()"><i class="material-icons" style="font-size:14px; vertical-align:middle; margin-right:5px;">refresh</i> RESET</button>
-            <button class="btn-reset" style="background:#1a73e8; margin-top:5px;" onclick="runManualAnalysis()"><i class="material-icons" style="font-size:14px; vertical-align:middle; margin-right:5px;">analytics</i> AI ANALYSIS</button>
+            <button class="btn-reset" onclick="resetTripMeter()"><i class="material-icons" style="font-size:16px; vertical-align:middle; margin-right:5px;">refresh</i> RESET TRIP</button>
+            <button class="btn-reset" style="background:#1a73e8; margin-top:8px;" onclick="runManualAnalysis()"><i class="material-icons" style="font-size:16px; vertical-align:middle; margin-right:5px;">analytics</i> AI ANALYSIS</button>
         </div>
     </div>
 
@@ -193,7 +204,7 @@
     <div class="turn-banner" id="turn-banner">
         <i class="material-icons" id="turn-icon">explore</i>
         <div>
-            <div style="font-size:12px; font-weight:bold;">Status</div>
+            <div style="font-size:13px; font-weight:bold;">Status</div>
             <div class="turn-text" id="turn-text">Free Ride Mode</div>
         </div>
     </div>
@@ -206,15 +217,15 @@
                 <label>Time to Full Charge (Hours)</label>
                 <input type="number" id="charge-time-input" value="6" min="1" step="0.5" onchange="saveState()">
             </div>
-            <p style="font-size: 11px; color: #666; margin-bottom: 15px;">Ito ang oras na kailangan para ma-full charge ang e-bike mo mula 0%. Ginagamit ito sa AI Analysis para ma-kalkula ang charging time sa destination.</p>
-            <button class="modal-btn" onclick="closeChargePlanner()">SAVE</button>
+            <p style="font-size: 12px; color: #555; margin-bottom: 18px; font-weight: 500; line-height: 1.4;">Ito ang oras na kailangan para ma-full charge ang e-bike mo mula 0%. Ginagamit ito sa AI Analysis para ma-kalkula ang charging time sa destination.</p>
+            <button class="modal-btn" onclick="closeChargePlanner()">SAVE SETTINGS</button>
         </div>
     </div>
 
-    <!-- SMART ANALYSIS MODAL (WILL CONTAIN BREAKDOWN) -->
+    <!-- SMART ANALYSIS MODAL -->
     <div class="modal-overlay" id="analysis-modal">
-        <div class="modal-box">
-            <div class="modal-title"><i class="material-icons">insights</i> Route Breakdown & AI Analysis</div>
+        <div class="modal-box" style="max-width: 380px;">
+            <div class="modal-title"><i class="material-icons">insights</i> Route Breakdown & AI</div>
             <div id="analysis-content" style="width: 100%;"></div>
             <button class="modal-btn close" onclick="closeAnalysis()">CLOSE</button>
         </div>
@@ -241,12 +252,26 @@
             localStorage.setItem('ebike_chargeHours', fullChargeHours);
         }
 
+        // SMART DASHBOARD AUTO-HIDE LOGIC
+        function activateSearchMode(inputEl) {
+            document.getElementById('ebike-dash').classList.add('smart-hidden');
+            handleSearchInput(inputEl);
+        }
+        function deactivateSearchMode() {
+            setTimeout(() => {
+                const box = document.getElementById('suggestions-box');
+                if(box.style.display === 'none' || box.innerHTML === '') {
+                    document.getElementById('ebike-dash').classList.remove('smart-hidden');
+                }
+            }, 300);
+        }
+
         let isDashCollapsed = false;
         function toggleDashboard() {
             const content = document.getElementById('dash-content');
             const icon = document.getElementById('toggle-dash-icon');
             if (isDashCollapsed) {
-                content.style.maxHeight = "500px";
+                content.style.maxHeight = "600px";
                 icon.innerText = "expand_less";
                 isDashCollapsed = false;
             } else {
@@ -273,10 +298,10 @@
         L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 20 }).addTo(map);
 
         const navArrowIcon = L.divIcon({
-            html: `<svg class="direction-marker" id="nav-arrow" width="50" height="50" viewBox="0 0 100 100">
-              <path d="M50 5 L90 85 L50 65 L10 85 Z" fill="#1a73e8" stroke="#ffffff" stroke-width="6" stroke-linejoin="round" filter="drop-shadow(0px 4px 4px rgba(0,0,0,0.3))"/>
+            html: `<svg class="direction-marker" id="nav-arrow" width="56" height="56" viewBox="0 0 100 100">
+              <path d="M50 5 L90 85 L50 65 L10 85 Z" fill="#1a73e8" stroke="#ffffff" stroke-width="6" stroke-linejoin="round" filter="drop-shadow(0px 4px 6px rgba(0,0,0,0.4))"/>
             </svg>`,
-            className: '', iconSize: [50, 50], iconAnchor: [25, 40]
+            className: '', iconSize: [56, 56], iconAnchor: [28, 45]
         });
 
         let marker = null;
@@ -296,7 +321,7 @@
         let activeRouteDistanceKm = 0;
 
         function forceAccurateLocation() {
-            showToast("Locating...");
+            showToast("Kumukuha ng GPS Location...");
             navigator.geolocation.getCurrentPosition(pos => {
                 currentLat = pos.coords.latitude;
                 currentLng = pos.coords.longitude;
@@ -304,7 +329,7 @@
                 map.setView([currentLat, currentLng], isNavigating ? 19 : 17, {animate: true});
                 hideToast();
             }, err => {
-                showToast("GPS Error. Turn on Location.");
+                showToast("Bigo. Paki-on ang GPS Settings.");
                 setTimeout(hideToast, 3000);
             }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
         }
@@ -318,6 +343,7 @@
         let activeSearchInput = null;
         let debounce;
         
+        // UPGRADED SEARCH ENGINE (PHOTON API WITH LOCATION BIAS FOR BETTER RESULTS)
         function handleSearchInput(inputEl) {
             activeSearchInput = inputEl;
             inputEl.removeAttribute('data-lat');
@@ -326,45 +352,75 @@
             const query = inputEl.value;
             const box = document.getElementById('suggestions-box');
             
-            if (query.length < 3) { box.style.display = 'none'; return; }
+            if (query.length < 3) { 
+                box.style.display = 'none'; 
+                return; 
+            }
             
+            // Positioning fixed box relative to input
             const rect = inputEl.getBoundingClientRect();
-            box.style.top = rect.bottom + 'px';
+            box.style.top = (rect.bottom + 5) + 'px';
             box.style.left = rect.left + 'px';
             box.style.width = rect.width + 'px';
+            
+            box.innerHTML = `<div class="search-loading"><i class="material-icons" style="animation: spin 1s linear infinite;">autorenew</i> Naghahanap...</div>`;
+            box.style.display = 'block';
             
             clearTimeout(debounce);
             debounce = setTimeout(async () => {
                 try {
-                    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=ph&q=${encodeURIComponent(query)}`);
+                    // Photon API gives better local fuzzy search, biased to current location
+                    let url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=8`;
+                    if(currentLat && currentLng) { url += `&lat=${currentLat}&lon=${currentLng}`; }
+                    
+                    const res = await fetch(url);
                     const data = await res.json();
                     box.innerHTML = '';
-                    if (data.length > 0) {
-                        data.slice(0, 4).forEach(item => {
-                            const div = document.createElement('div'); div.className = 'suggestion-item';
-                            div.innerHTML = `<i class="material-icons" style="color:#777; margin-right:12px; font-size:20px;">place</i><div style="font-weight:bold; color:#444;">${item.display_name.split(',')[0]}</div>`;
+                    
+                    if (data.features && data.features.length > 0) {
+                        data.features.forEach(feature => {
+                            const props = feature.properties;
+                            const name = props.name || props.street || props.city;
+                            const context = [props.city, props.state].filter(Boolean).join(', ');
+                            const displayName = name + (context ? `, ${context}` : '');
+                            const lat = feature.geometry.coordinates[1];
+                            const lon = feature.geometry.coordinates[0];
+                            
+                            const div = document.createElement('div'); 
+                            div.className = 'suggestion-item';
+                            div.innerHTML = `<i class="material-icons" style="color:#1a73e8; margin-right:12px; font-size:22px;">place</i><div style="font-weight:bold; color:#444;">${displayName}</div>`;
                             div.onclick = () => {
-                                activeSearchInput.value = item.name || item.display_name.split(',')[0];
-                                activeSearchInput.dataset.lat = item.lat;
-                                activeSearchInput.dataset.lng = item.lon;
+                                activeSearchInput.value = name;
+                                activeSearchInput.dataset.lat = lat;
+                                activeSearchInput.dataset.lng = lon;
                                 box.style.display = 'none';
+                                document.getElementById('ebike-dash').classList.remove('smart-hidden');
                             };
                             box.appendChild(div);
                         });
-                        box.style.display = 'block';
+                    } else {
+                        box.innerHTML = `<div class="search-loading" style="color:#ea4335;">Walang nahanap.</div>`;
+                        setTimeout(() => box.style.display = 'none', 2000);
                     }
-                } catch(e){}
-            }, 500);
+                } catch(e){
+                    box.style.display = 'none';
+                }
+            }, 600);
         }
+
+        // Add Global Keyframe for spinner
+        const style = document.createElement('style');
+        style.innerHTML = `@keyframes spin { 100% { transform: rotate(360deg); } }`;
+        document.head.appendChild(style);
 
         document.addEventListener('click', function(e) {
             const box = document.getElementById('suggestions-box');
             if (activeSearchInput && !activeSearchInput.contains(e.target) && !box.contains(e.target)) {
                 box.style.display = 'none';
+                document.getElementById('ebike-dash').classList.remove('smart-hidden');
             }
         });
 
-        // UPDATE PLACEHOLDERS TO SHOW SEQUENCE
         function updatePlaceholders() {
             const inputs = document.querySelectorAll('.dest-input');
             inputs.forEach((input, index) => {
@@ -385,7 +441,7 @@
         }
 
         function addStopInput() {
-            if(!isDashCollapsed) toggleDashboard(); 
+            document.getElementById('ebike-dash').classList.add('smart-hidden');
             
             const container = document.getElementById('stops-container');
             const div = document.createElement('div');
@@ -393,8 +449,8 @@
             div.style.position = 'relative';
             div.innerHTML = `
                 <i class="material-icons loc-icon">flag</i>
-                <input type="text" class="dest-input" placeholder="" oninput="handleSearchInput(this)" onfocus="handleSearchInput(this)" autocomplete="off">
-                <i class="material-icons remove-icon" onclick="this.parentElement.remove(); updatePlaceholders();">close</i>
+                <input type="text" class="dest-input" placeholder="" oninput="handleSearchInput(this)" onfocus="activateSearchMode(this)" onblur="deactivateSearchMode()" autocomplete="off">
+                <i class="material-icons remove-icon" onclick="this.parentElement.remove(); updatePlaceholders();">cancel</i>
             `;
             container.appendChild(div);
             
@@ -417,14 +473,14 @@
             });
 
             if (wps.length < 2) {
-                alert("Please select at least one valid destination from the suggestions.");
+                alert("Pumili ng valid na lokasyon mula sa suggestions.");
                 return;
             }
 
             activeWaypointsList = wps; 
             
             if(routingControl) map.removeControl(routingControl);
-            showToast("Finding multi-stop route...");
+            showToast("Kinakalkula ang ruta...");
             
             routingControl = L.Routing.control({
                 waypoints: wps,
@@ -474,6 +530,7 @@
                 map.fitBounds(L.latLngBounds(wps), { padding: [40, 40] });
                 
                 runSmartAnalysis(activeRouteDistanceKm, activeLegDistances);
+                document.getElementById('ebike-dash').classList.remove('smart-hidden');
                 
             }).addTo(map);
         }
@@ -488,15 +545,14 @@
             const contentDiv = document.getElementById('analysis-content');
             let isMultiStop = legDistances.length > 1;
 
-            // HTML PARA SA LEG-BY-LEG BREAKDOWN UI
-            let breakdownHtml = `<div style="background:#f1f3f4; padding:12px; border-radius:10px; margin-bottom:15px; border: 1px solid #ddd;">`;
-            breakdownHtml += `<div style="font-size:12px; color:#555; font-weight:900; margin-bottom:8px; text-transform:uppercase;">Route Breakdown:</div>`;
+            let breakdownHtml = `<div style="background:#f8f9fa; padding:15px; border-radius:12px; margin-bottom:18px; border: 1px solid #e0e0e0;">`;
+            breakdownHtml += `<div style="font-size:13px; color:#555; font-weight:900; margin-bottom:10px; text-transform:uppercase; letter-spacing:0.5px;">Route Breakdown:</div>`;
             for(let i=0; i < legDistances.length; i++) {
-                let fromName = (i === 0) ? "Your Location" : `Dest ${i}`;
-                let toName = (i === legDistances.length - 1) ? "Final Dest" : `Dest ${i+1}`;
-                breakdownHtml += `<div style="font-size:13px; color:#333; margin-bottom:5px; display:flex; align-items:center;"><i class="material-icons" style="font-size:16px; color:#1a73e8; margin-right:8px;">timeline</i> ${fromName} ➔ ${toName}: <b style="margin-left:auto;">${legDistances[i].toFixed(1)} km</b></div>`;
+                let fromName = (i === 0) ? "Start" : `Dest ${i}`;
+                let toName = (i === legDistances.length - 1) ? "Final" : `Dest ${i+1}`;
+                breakdownHtml += `<div style="font-size:14px; color:#333; margin-bottom:8px; display:flex; align-items:center;"><i class="material-icons" style="font-size:18px; color:#1a73e8; margin-right:8px;">timeline</i> ${fromName} ➔ ${toName}: <b style="margin-left:auto; color:#1a73e8;">${legDistances[i].toFixed(1)} km</b></div>`;
             }
-            breakdownHtml += `<div style="border-top: 1px solid #ccc; margin-top:8px; padding-top:8px; font-size:14px; font-weight:900; text-align:right;">Total: ${totalDistKm.toFixed(1)} km</div>`;
+            breakdownHtml += `<div style="border-top: 2px dashed #ccc; margin-top:10px; padding-top:10px; font-size:16px; font-weight:900; text-align:right; color:#188038;">Total: ${totalDistKm.toFixed(1)} km</div>`;
             breakdownHtml += `</div>`;
             
             let analysisText = "";
@@ -547,7 +603,8 @@
             if(activeRouteDistanceKm > 0 && activeLegDistances.length > 0) {
                 runSmartAnalysis(activeRouteDistanceKm, activeLegDistances);
             } else {
-                alert("Please calculate a route first before running AI analysis.");
+                showToast("Maghanap muna ng ruta bago mag-analyze.");
+                setTimeout(hideToast, 2000);
             }
         }
 
