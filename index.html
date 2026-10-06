@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>E-Bike Nav Pro - Layout Fix & Route Fix</title>
+    <title>E-Bike Nav Pro - Strict E-Bike Routing</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
@@ -17,11 +17,11 @@
         #map { position: absolute; top: -50vh; left: -50vw; width: 200vw; height: 200vh; z-index: 1; transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1); transform-origin: center center; }
         .leaflet-routing-container { display: none !important; }
         
-        /* SEARCH PANEL (NASA TAAS) */
+        /* SEARCH PANEL */
         .search-panel { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); width: 92%; max-width: 400px; z-index: 1005; background: white; border-radius: 15px; box-shadow: 0 8px 25px rgba(0,0,0,0.4); padding: 12px; transition: 0.3s; }
         .search-panel.hidden { transform: translate(-50%, -150%); opacity: 0; pointer-events: none; }
         
-        .stops-wrapper { max-height: 35vh; overflow-y: auto; padding-right: 5px; } 
+        .stops-wrapper { max-height: 40vh; overflow-y: auto; padding-right: 5px; } 
         
         .input-row { display: flex; align-items: center; padding: 8px 5px; border-bottom: 1px solid #eee; position: relative; }
         .input-row:last-child { border-bottom: none; }
@@ -31,7 +31,7 @@
         .input-row input { border: none; font-size: 15px; font-weight: 700; outline: none; width: 100%; background: transparent; color: #444; }
         .input-row input::placeholder { color: #999; font-weight: 500; }
         
-        .action-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 5px 0px 5px; }
+        .action-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 5px 5px 5px; }
         .btn-add-stop { background: none; border: none; color: #1a73e8; font-weight: 900; cursor: pointer; display: flex; align-items: center; font-size: 14px; padding: 5px; transition: 0.2s; }
         .btn-add-stop:active { transform: scale(0.95); }
         .btn-find-route { background: #1a73e8; color: white; border: none; border-radius: 25px; padding: 10px 20px; font-weight: 900; cursor: pointer; box-shadow: 0 4px 12px rgba(26,115,232,0.4); font-size: 14px; transition: 0.2s; }
@@ -43,43 +43,43 @@
         .suggestion-item:active { background: #f0f4f8; }
         .search-loading { padding: 15px; text-align: center; color: #777; font-weight: bold; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 10px; }
         
-        /* E-BIKE DASHBOARD (INILIPAT SA IBABA PARA HINDI MAG-OVERLAP) */
-        .ebike-dash { position: absolute; bottom: 130px; right: 15px; width: 175px; background: rgba(255, 255, 255, 0.9); border-radius: 15px; box-shadow: 0 8px 25px rgba(0,0,0,0.25); padding: 12px; z-index: 999; backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.8); transition: all 0.3s ease; }
+        /* SMART E-BIKE DASHBOARD */
+        .ebike-dash { position: absolute; top: 130px; right: 15px; width: 190px; background: rgba(255, 255, 255, 0.9); border-radius: 15px; box-shadow: 0 8px 25px rgba(0,0,0,0.25); padding: 15px; z-index: 999; backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.8); transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1); }
         .ebike-dash.smart-hidden { transform: translateX(120%) !important; opacity: 0; pointer-events: none; }
         
         .dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-        .dash-title { font-size: 13px; font-weight: 900; color: #333; text-transform: uppercase; letter-spacing: 1px; margin: 0; }
+        .dash-title { font-size: 14px; font-weight: 900; color: #333; text-transform: uppercase; letter-spacing: 1px; margin: 0; }
         
-        .dash-controls { display: flex; gap: 5px; }
-        .info-btn { background: #f1f3f4; border: none; color: #1a73e8; border-radius: 50%; width: 26px; height: 26px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .info-btn i { font-size: 16px; }
+        .dash-controls { display: flex; gap: 8px; }
+        .info-btn { background: #f1f3f4; border: none; color: #1a73e8; border-radius: 50%; width: 28px; height: 28px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .info-btn i { font-size: 18px; }
         
         #dash-content { transition: max-height 0.3s ease; overflow: hidden; max-height: 500px; }
         
-        .dash-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; margin-top: 8px; font-size: 13px; font-weight: 800; color: #444; }
-        .dash-val { color: #1a73e8; font-size: 18px; font-weight: 900; }
+        .dash-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; margin-top: 10px; font-size: 14px; font-weight: 800; color: #444; }
+        .dash-val { color: #1a73e8; font-size: 20px; font-weight: 900; }
         .dash-val.red { color: #ea4335; }
         
-        .bat-input-group { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 11px; font-weight: 800; color: #333; }
-        .bat-input-group input { width: 50px; border: 2px solid rgba(26, 115, 232, 0.3); border-radius: 6px; padding: 4px; text-align: center; font-size: 13px; font-weight: 900; background: rgba(255,255,255,1); outline: none; transition: 0.2s; }
+        .bat-input-group { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-size: 12px; font-weight: 800; color: #333; }
+        .bat-input-group input { width: 55px; border: 2px solid rgba(26, 115, 232, 0.3); border-radius: 6px; padding: 5px; text-align: center; font-size: 14px; font-weight: 900; background: rgba(255,255,255,1); outline: none; transition: 0.2s; }
         .bat-input-group input:focus { border-color: #1a73e8; }
         
-        .btn-reset { width: 100%; background: #ea4335; color: white; border: none; padding: 8px; border-radius: 8px; font-weight: 900; cursor: pointer; margin-top: 6px; text-transform: uppercase; font-size: 11px; transition: 0.2s; box-shadow: 0 4px 10px rgba(234, 67, 53, 0.3); }
+        .btn-reset { width: 100%; background: #ea4335; color: white; border: none; padding: 10px; border-radius: 8px; font-weight: 900; cursor: pointer; margin-top: 8px; text-transform: uppercase; font-size: 12px; transition: 0.2s; box-shadow: 0 4px 10px rgba(234, 67, 53, 0.3); }
         .btn-reset:active { transform: scale(0.95); }
 
         /* BOTTOM ROUTE / START PANEL */
-        .bottom-panel { position: absolute; bottom: 0; left: 0; width: 100%; background: white; border-radius: 20px 20px 0 0; padding: 15px 20px 20px 20px; z-index: 1000; box-shadow: 0 -8px 25px rgba(0,0,0,0.15); transition: 0.4s cubic-bezier(0.25, 1, 0.5, 1); display: flex; flex-direction: column; gap: 10px; }
+        .bottom-panel { position: absolute; bottom: 0; left: 0; width: 100%; background: white; border-radius: 20px 20px 0 0; padding: 20px 20px 25px 20px; z-index: 1000; box-shadow: 0 -8px 25px rgba(0,0,0,0.15); transition: 0.4s cubic-bezier(0.25, 1, 0.5, 1); display: flex; flex-direction: column; gap: 12px; }
         .bottom-panel.hidden { transform: translateY(100%); }
-        .route-title { font-size: 20px; color: #188038; font-weight: 900; }
-        .route-desc { font-size: 12px; color: #555; font-weight: bold; }
+        .route-title { font-size: 22px; color: #188038; font-weight: 900; }
+        .route-desc { font-size: 13px; color: #555; font-weight: bold; }
         
-        .btn-start { background: #1a73e8; color: white; border: none; border-radius: 30px; padding: 14px; font-size: 16px; font-weight: 900; cursor: pointer; width: 100%; display: flex; justify-content: center; align-items: center; gap: 10px; box-shadow: 0 6px 15px rgba(26, 115, 232, 0.3); transition: 0.2s; }
+        .btn-start { background: #1a73e8; color: white; border: none; border-radius: 30px; padding: 16px; font-size: 18px; font-weight: 900; cursor: pointer; width: 100%; display: flex; justify-content: center; align-items: center; gap: 10px; box-shadow: 0 6px 15px rgba(26, 115, 232, 0.3); transition: 0.2s; }
         .btn-start:active { transform: scale(0.96); }
         .btn-stop { background: #ea4335; display: none; box-shadow: 0 6px 15px rgba(234, 67, 53, 0.3); }
 
-        /* RECENTER BUTTON (NASA KALIWA NA PARA BALANSE) */
-        .btn-gps { position: absolute; bottom: 130px; left: 15px; width: 45px; height: 45px; background: white; border: none; border-radius: 50%; box-shadow: 0 6px 15px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; cursor: pointer; color: #1a73e8; z-index: 999; transition: 0.2s; }
-        .btn-gps i { font-size: 24px; }
+        /* RECENTER BUTTON */
+        .btn-gps { position: absolute; bottom: 140px; left: 15px; width: 50px; height: 50px; background: white; border: none; border-radius: 50%; box-shadow: 0 6px 15px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; cursor: pointer; color: #1a73e8; z-index: 999; transition: 0.2s; }
+        .btn-gps i { font-size: 26px; }
         .btn-gps:active { transform: scale(0.9); }
         
         /* TURN BANNER */
@@ -93,8 +93,8 @@
         .modal-title { font-size: 18px; font-weight: 900; color: #1a73e8; margin-bottom: 18px; display: flex; align-items: center; gap: 10px; }
         .modal-input-group { margin-bottom: 18px; }
         .modal-input-group label { display: block; font-size: 13px; font-weight: 800; color: #444; margin-bottom: 8px; }
-        .modal-input-group input, .modal-input-group select { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 10px; font-size: 15px; font-weight: bold; outline: none; transition: 0.2s; background: white; }
-        .modal-input-group input:focus, .modal-input-group select:focus { border-color: #1a73e8; }
+        .modal-input-group input { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 10px; font-size: 15px; font-weight: bold; outline: none; transition: 0.2s; background: white; }
+        .modal-input-group input:focus { border-color: #1a73e8; }
         .modal-btn { background: #1a73e8; color: white; border: none; padding: 12px; border-radius: 10px; width: 100%; font-size: 15px; font-weight: 900; cursor: pointer; box-shadow: 0 4px 12px rgba(26,115,232,0.3); }
         .modal-btn.close { background: #f1f3f4; color: #333; margin-top: 12px; box-shadow: none; }
         .analysis-text { font-size: 15px; line-height: 1.6; font-weight: bold; color: #333; margin-bottom: 18px; }
@@ -116,9 +116,9 @@
         @media (orientation: landscape) {
             .search-panel { top: 15px; left: 15px; transform: none; width: 340px; max-height: 85vh; }
             .search-panel.hidden { transform: translateY(-150%); }
-            .ebike-dash { bottom: 15px; right: 15px; top: auto; }
+            .ebike-dash { top: 15px; right: 15px; left: auto; }
             .bottom-panel { width: 340px; left: 15px; right: auto; bottom: 15px; border-radius: 15px; padding: 15px; }
-            .btn-gps { right: 15px; bottom: 15px; left: auto; }
+            .btn-gps { right: 15px; bottom: 20px; left: auto; }
             .turn-banner { top: 15px; left: 50%; transform: translateX(-50%); }
         }
     </style>
@@ -133,7 +133,7 @@
 
     <div class="suggestions" id="suggestions-box"></div>
 
-    <!-- SEARCH PANEL -->
+    <!-- SEARCH PANEL MULTI-STOP WITH LEG-BY-LEG UI -->
     <div class="search-panel" id="search-panel">
         <div class="stops-wrapper" id="stops-wrapper">
             <div class="input-row">
@@ -155,7 +155,7 @@
         </div>
     </div>
 
-    <!-- SMART DASHBOARD (NASA IBABA NA) -->
+    <!-- SMART DASHBOARD -->
     <div class="ebike-dash" id="ebike-dash">
         <div class="dash-header">
             <h3 class="dash-title">Dashboard</h3>
@@ -170,20 +170,20 @@
                 START BAT: 
                 <div><input type="number" id="battery-input" value="100" max="100" min="0" onchange="manualDataUpdate()"> %</div>
             </div>
-            <div class="bat-input-group" style="margin-bottom: 8px;">
+            <div class="bat-input-group" style="margin-bottom: 12px;">
                 MAX RANGE: 
                 <div><input type="number" id="max-range-input" value="30" min="1" onchange="manualDataUpdate()"> km</div>
             </div>
             
-            <hr style="border: 0; border-top: 2px solid rgba(0,0,0,0.08); margin: 8px 0;">
+            <hr style="border: 0; border-top: 2px solid rgba(0,0,0,0.08); margin: 10px 0;">
             
-            <div class="dash-row">SPD: <span class="dash-val" id="disp-speed">0 <span style="font-size:11px;">km/h</span></span></div>
+            <div class="dash-row">SPD: <span class="dash-val" id="disp-speed">0 <span style="font-size:12px;">km/h</span></span></div>
             <div class="dash-row">TRIP: <span class="dash-val" id="disp-trip">0.00</span></div>
             <div class="dash-row">LIVE BAT: <span class="dash-val" id="disp-bat">100%</span></div>
-            <div class="dash-row" style="font-size: 10px; justify-content: center; color: #666;">(Est. Range: <span id="disp-range">30.0</span> km)</div>
+            <div class="dash-row" style="font-size: 11px; justify-content: center; color: #666;">(Est. Range: <span id="disp-range">30.0</span> km)</div>
             
-            <button class="btn-reset" onclick="resetTripMeter()"><i class="material-icons" style="font-size:14px; vertical-align:middle; margin-right:4px;">refresh</i> RESET TRIP</button>
-            <button class="btn-reset" style="background:#1a73e8; margin-top:6px;" onclick="runManualAnalysis()"><i class="material-icons" style="font-size:14px; vertical-align:middle; margin-right:4px;">analytics</i> AI ANALYSIS</button>
+            <button class="btn-reset" onclick="resetTripMeter()"><i class="material-icons" style="font-size:16px; vertical-align:middle; margin-right:5px;">refresh</i> RESET TRIP</button>
+            <button class="btn-reset" style="background:#1a73e8; margin-top:8px;" onclick="runManualAnalysis()"><i class="material-icons" style="font-size:16px; vertical-align:middle; margin-right:5px;">analytics</i> AI ANALYSIS</button>
         </div>
     </div>
 
@@ -264,7 +264,7 @@
             setTimeout(() => {
                 const box = document.getElementById('suggestions-box');
                 if(box.style.display === 'none' || box.innerHTML === '') {
-                    // Do nothing, dashboard is always visible at bottom now
+                    // Do nothing
                 }
             }, 300);
         }
@@ -479,8 +479,8 @@
             
             routingControl = L.Routing.control({
                 waypoints: wps,
-                // STANDARD VEHICLE ROUTING TO FIX ROAD RESTRICTION ISSUE
-                router: L.Routing.osrmv1({ serviceUrl: `https://router.project-osrm.org/route/v1` }), 
+                // STRICT BICYCLE ROUTING BACK AS REQUESTED
+                router: L.Routing.osrmv1({ serviceUrl: `https://routing.openstreetmap.de/routed-bike/route/v1` }), 
                 routeWhileDragging: false,
                 addWaypoints: false,
                 showAlternatives: true, 
@@ -537,7 +537,7 @@
                 let stopCountText = activeWaypointsList.length > 2 ? `(${activeWaypointsList.length - 1} Destinations) • ` : "";
                 
                 document.getElementById('route-eta').innerText = timeMin + " min";
-                document.getElementById('route-dist').innerText = stopCountText + activeRouteDistanceKm.toFixed(1) + " km • Standard Route";
+                document.getElementById('route-dist').innerText = stopCountText + activeRouteDistanceKm.toFixed(1) + " km • E-Bike Route";
                 
                 activeWaypointsList = routingControl.getWaypoints().map(wp => wp.latLng);
                 runSmartAnalysis(activeRouteDistanceKm, activeLegDistances);
