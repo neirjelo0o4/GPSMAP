@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>E-Bike Nav Pro - Accurate & Alternate Routes</title>
+    <title>E-Bike Nav Pro - Free Ride & Auto-Route</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
@@ -104,11 +104,11 @@
 
     <button class="btn-gps" onclick="forceAccurateLocation()"><i class="material-icons">gps_fixed</i></button>
 
-    <div class="bottom-panel" id="bottom-panel" style="display: none;">
+    <!-- BOTTOM PANEL (Laging naka-display ngayon para sa Free Ride) -->
+    <div class="bottom-panel" id="bottom-panel">
         <div>
-            <div class="route-title" id="route-eta">-- min</div>
-            <div class="route-desc" id="route-dist">-- km • E-Bike Route (No Tolls)</div>
-            <div class="route-desc" style="color:#1a73e8; font-weight:bold; margin-top:5px;">*Tap faded blue line for alternate route</div>
+            <div class="route-title" id="route-eta">Free Ride Mode</div>
+            <div class="route-desc" id="route-dist">GPS Tracking & Trip Meter Only</div>
         </div>
         <button class="btn-start" id="btn-start" onclick="toggleNav()">
             <i class="material-icons">navigation</i> START
@@ -119,10 +119,10 @@
     </div>
 
     <div class="turn-banner" id="turn-banner">
-        <i class="material-icons" id="turn-icon">straight</i>
+        <i class="material-icons" id="turn-icon">explore</i>
         <div>
-            <div style="font-size:14px; font-weight:bold;">Next</div>
-            <div style="font-size:20px; font-weight:bold;" id="turn-text">Follow the blue line</div>
+            <div style="font-size:14px; font-weight:bold;">Status</div>
+            <div style="font-size:20px; font-weight:bold;" id="turn-text">Free Ride Mode</div>
         </div>
     </div>
 
@@ -167,7 +167,7 @@
             }, err => {
                 showToast("Bigo. Paki-on ang GPS Location ng phone.");
                 setTimeout(hideToast, 3000);
-            }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }); // maximumAge: 0 forces fresh GPS data
+            }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
         }
 
         function updateMarker() {
@@ -175,7 +175,7 @@
             else marker.setLatLng([currentLat, currentLng]);
         }
 
-        forceAccurateLocation(); // Initial call on load
+        forceAccurateLocation(); 
 
         // SEARCH SUGGESTIONS
         let debounce;
@@ -215,16 +215,15 @@
 
             routingControl = L.Routing.control({
                 waypoints: [ L.latLng(currentLat, currentLng), destinationLatLng ],
-                // Ginamit ang OSRM Bike Service para iwas Toll/Expressway
-                router: L.Routing.osrmv1({ serviceUrl: 'https://routing.openstreetmap.de/routed-bike/route/v1' }),
+                router: L.Routing.osrmv1({ serviceUrl: 'https://routing.openstreetmap.de/routed-bike/route/v1' }), // EBIKE STRICT ROUTING
                 routeWhileDragging: false,
                 addWaypoints: false,
-                showAlternatives: true, // AUTO SEARCH FOR ALTERNATES
-                altLineOptions: { styles: [{color: '#8ab4f8', opacity: 0.9, weight: 6}] }, // Faded Blue (Clickable)
-                lineOptions: { styles: [{color: '#1a73e8', opacity: 1, weight: 8}] }, // Main Blue
+                showAlternatives: true, 
+                altLineOptions: { styles: [{color: '#8ab4f8', opacity: 0.9, weight: 6}] }, 
+                lineOptions: { styles: [{color: '#1a73e8', opacity: 1, weight: 8}] }, 
                 createMarker: function(i, wp) {
-                    if (i === 0) return null; // No default start marker, we have our car
-                    return L.marker(wp.latLng); // Dest marker
+                    if (i === 0) return null; 
+                    return L.marker(wp.latLng); 
                 }
             }).on('routesfound', function(e) {
                 hideToast();
@@ -233,8 +232,7 @@
                 const timeMin = Math.round(primary.summary.totalTime / 60);
                 
                 document.getElementById('route-eta').innerText = timeMin + " min";
-                document.getElementById('route-dist').innerText = distKm + " km";
-                document.getElementById('bottom-panel').style.display = 'flex';
+                document.getElementById('route-dist').innerText = distKm + " km • E-Bike Route • Tap faded blue for alternates";
                 
                 map.fitBounds(L.latLngBounds([L.latLng(currentLat, currentLng), destinationLatLng]), { padding: [40, 40] });
             }).addTo(map);
@@ -245,7 +243,7 @@
             startBattery = parseFloat(document.getElementById('battery-input').value) || 0;
             if(startBattery > 100) startBattery = 100;
             if(startBattery < 0) startBattery = 0;
-            tripDistance = 0; // Reset trip on manual battery change
+            tripDistance = 0; 
             updateDashboard();
         }
 
@@ -265,14 +263,9 @@
             document.getElementById('disp-range').innerText = currentRange.toFixed(1) + " km";
         }
 
-        // ANG HINAHANAP MONG RESET BUTTON LOGIC
         window.resetTripMeter = function() {
-            // Wag i-reset ang battery sa 100! 
-            // Gawing "Starting Battery" kung ano man ang natitirang battery ngayon.
-            startBattery = currentLiveBattery;
-            tripDistance = 0; // Zero out ang trip meter
-            
-            // I-update din yung input box para malinaw
+            startBattery = currentLiveBattery; // Keep current physical battery
+            tripDistance = 0; 
             document.getElementById('battery-input').value = startBattery.toFixed(1);
             updateDashboard();
         }
@@ -280,9 +273,8 @@
         // NAVIGATION TOGGLE
         window.toggleNav = function() {
             if(!isNavigating) {
-                // START
                 isNavigating = true;
-                lastTrackedCoords = {lat: currentLat, lng: currentLng}; // Start tracking trip from here
+                lastTrackedCoords = {lat: currentLat, lng: currentLng}; 
                 
                 document.getElementById('search-panel').classList.add('hidden');
                 document.getElementById('btn-start').style.display = 'none';
@@ -292,8 +284,18 @@
                 setTimeout(()=> document.getElementById('turn-banner').style.opacity = '1', 50);
                 
                 map.setView([currentLat, currentLng], 19, {animate: true});
+                
+                // Audio Check
+                if(destinationLatLng) {
+                    speak("Navigation started. Follow the route.");
+                    document.getElementById('turn-text').innerText = "Follow the route";
+                    document.getElementById('turn-icon').innerText = "straight";
+                } else {
+                    speak("Free ride started. Tracking trip and battery.");
+                    document.getElementById('turn-text').innerText = "Free Ride Mode";
+                    document.getElementById('turn-icon').innerText = "explore";
+                }
             } else {
-                // STOP
                 isNavigating = false;
                 
                 document.getElementById('search-panel').classList.remove('hidden');
@@ -304,6 +306,7 @@
                 setTimeout(()=> document.getElementById('turn-banner').style.display = 'none', 300);
                 
                 map.setZoom(17, {animate: true});
+                speak("Navigation ended.");
             }
         }
 
@@ -318,7 +321,6 @@
                 document.getElementById('disp-speed').innerText = Math.round(speed) + " km/h";
                 updateMarker();
 
-                // Compute Trip & Battery if Navigating
                 if(isNavigating) {
                     map.panTo([currentLat, currentLng], {animate: true});
                     
@@ -328,31 +330,26 @@
                         updateDashboard();
                     }
                     lastTrackedCoords = {lat: currentLat, lng: currentLng};
-                    
-                    // Simple Turn Instructions Mock
-                    if(destinationLatLng) {
-                        const d = map.distance([currentLat, currentLng], destinationLatLng);
-                        if(d < 30) {
-                            document.getElementById('turn-text').innerText = "Arrived at destination!";
-                            document.getElementById('turn-icon').innerText = "flag";
-                            toggleNav(); // Auto exit
-                        }
-                    }
                 }
 
-                // Car Rotation
                 if(speed > 1 && pos.coords.heading !== null && !isNaN(pos.coords.heading)) {
                     document.querySelector('.leaflet-marker-icon div').style.transform = `rotate(${pos.coords.heading}deg)`;
                 }
-            }, err => {}, { enableHighAccuracy: true, maximumAge: 0 }); // Max accuracy forced continuously
+            }, err => {}, { enableHighAccuracy: true, maximumAge: 0 }); 
         }
 
-        // UTILS
         function showToast(msg) {
             const t = document.getElementById('toast');
             t.innerText = msg; t.style.display = 'block';
         }
         function hideToast() { document.getElementById('toast').style.display = 'none'; }
+        
+        window.speak = function(text) {
+            if (!window.speechSynthesis) return;
+            let msg = new SpeechSynthesisUtterance(text);
+            msg.lang = 'en-US'; 
+            window.speechSynthesis.speak(msg);
+        };
     </script>
 </body>
 </html>
