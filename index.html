@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>E-Bike Nav Pro - Strict E-Bike & Bottom Dash</title>
+    <title>E-Bike Nav Pro - Auto-Recalc & Alternatives</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
@@ -43,7 +43,7 @@
         .suggestion-item:active { background: #f0f4f8; }
         .search-loading { padding: 15px; text-align: center; color: #777; font-weight: bold; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 10px; }
         
-        /* SMART E-BIKE DASHBOARD (IBINALIK SA IBABA - BOTTOM RIGHT) */
+        /* E-BIKE DASHBOARD (NASA IBABA PARA HINDI MAG-OVERLAP) */
         .ebike-dash { position: absolute; bottom: 130px; right: 15px; width: 175px; background: rgba(255, 255, 255, 0.9); border-radius: 15px; box-shadow: 0 8px 25px rgba(0,0,0,0.25); padding: 12px; z-index: 999; backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.8); transition: all 0.3s ease; }
         .ebike-dash.smart-hidden { transform: translateX(120%) !important; opacity: 0; pointer-events: none; }
         
@@ -77,7 +77,7 @@
         .btn-start:active { transform: scale(0.96); }
         .btn-stop { background: #ea4335; display: none; box-shadow: 0 6px 15px rgba(234, 67, 53, 0.3); }
 
-        /* RECENTER BUTTON (BOTTOM LEFT PARA BALANSE) */
+        /* RECENTER BUTTON */
         .btn-gps { position: absolute; bottom: 130px; left: 15px; width: 45px; height: 45px; background: white; border: none; border-radius: 50%; box-shadow: 0 6px 15px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; cursor: pointer; color: #1a73e8; z-index: 999; transition: 0.2s; }
         .btn-gps i { font-size: 24px; }
         .btn-gps:active { transform: scale(0.9); }
@@ -155,7 +155,7 @@
         </div>
     </div>
 
-    <!-- SMART DASHBOARD (NASA IBABA) -->
+    <!-- SMART DASHBOARD -->
     <div class="ebike-dash" id="ebike-dash">
         <div class="dash-header">
             <h3 class="dash-title">Dashboard</h3>
@@ -252,6 +252,7 @@
             localStorage.setItem('ebike_startBat', startBattery);
             localStorage.setItem('ebike_maxRange', maxRangeLimit);
             localStorage.setItem('ebike_tripDist', tripDistance);
+            
             fullChargeHours = parseFloat(document.getElementById('charge-time-input').value) || 6.0;
             localStorage.setItem('ebike_chargeHours', fullChargeHours);
         }
@@ -262,7 +263,7 @@
         function deactivateSearchMode() {
             setTimeout(() => {
                 const box = document.getElementById('suggestions-box');
-                // Removed the hide logic for dash since it's now at the bottom
+                // No action needed for dashboard since it's bottom right
             }, 300);
         }
 
@@ -315,6 +316,10 @@
         let activeLegDistances = []; 
         let currentWaypointTargetIndex = 1;
         
+        // AUTO-RECALC VARIABLES
+        let activeRouteCoords = [];
+        let isRecalculating = false;
+
         let lastTrackedCoords = null;
         let lastSpokenKm = 0;
         let spokenArrivalWarning = false;
@@ -480,9 +485,12 @@
                 router: L.Routing.osrmv1({ serviceUrl: `https://routing.openstreetmap.de/routed-bike/route/v1` }), 
                 routeWhileDragging: false,
                 addWaypoints: false,
+                
+                // ENABLE ALTERNATIVE ROUTES (BLUE LINES)
                 showAlternatives: true, 
                 altLineOptions: { styles: [{color: '#8ab4f8', opacity: 0.9, weight: 6}] }, 
                 lineOptions: { styles: [{color: '#1a73e8', opacity: 1, weight: 8}] }, 
+                
                 createMarker: function(i, wp, nWps) { 
                     if (i === 0) return null; 
                     
@@ -513,19 +521,23 @@
                 }
             }).on('routesfound', function(e) {
                 hideToast();
+                isRecalculating = false;
+                
                 const route = e.routes[0];
                 activeRouteDistanceKm = route.summary.totalDistance / 1000;
                 const timeMin = Math.round(route.summary.totalTime / 60);
                 
+                // STORE ROUTE COORDS FOR OFF-ROUTE DETECTION
+                activeRouteCoords = route.coordinates;
+                
                 activeLegDistances = [];
-                let coords = route.coordinates;
                 let wpIndices = route.waypointIndices; 
                 
                 for(let i = 1; i < wpIndices.length; i++) {
                     let dist = 0;
                     for(let j = wpIndices[i-1]; j < wpIndices[i]; j++) {
-                        if (coords[j] && coords[j+1]) {
-                            dist += map.distance(coords[j], coords[j+1]);
+                        if (activeRouteCoords[j] && activeRouteCoords[j+1]) {
+                            dist += map.distance(activeRouteCoords[j], activeRouteCoords[j+1]);
                         }
                     }
                     activeLegDistances.push(dist / 1000); 
@@ -724,6 +736,34 @@
                         lastSpokenKm = currentIntKm;
                     }
 
+                    // OFF-ROUTE AUTO RECALCULATION
+                    if (activeRouteCoords.length > 0 && !isRecalculating) {
+                        let isOffRoute = true;
+                        let minOffDist = Infinity;
+                        let currentLL = L.latLng(currentLat, currentLng);
+
+                        for(let i=0; i<activeRouteCoords.length; i++) {
+                            let dist = map.distance(currentLL, activeRouteCoords[i]);
+                            if (dist < 50) { // SAFE: Within 50 meters of the blue line
+                                isOffRoute = false;
+                                break;
+                            }
+                            if (dist < minOffDist) minOffDist = dist;
+                        }
+
+                        if (isOffRoute && minOffDist > 50) {
+                            isRecalculating = true;
+                            speak("You are off route. Recalculating.");
+                            showToast("Lihis sa daan. Recalculating...");
+                            
+                            // Update origin to current location and force routing engine to recalc
+                            activeWaypointsList[0] = currentLL;
+                            routingControl.setWaypoints(activeWaypointsList);
+                            activeRouteCoords = []; // Clear array until new route is found
+                        }
+                    }
+
+                    // ARRIVAL WARNING LOGIC
                     if (activeWaypointsList.length > currentWaypointTargetIndex) {
                         const targetWP = activeWaypointsList[currentWaypointTargetIndex];
                         const d = map.distance([currentLat, currentLng], targetWP); 
