@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>E-Bike Nav Pro - Multi-Stop Analysis</title>
+    <title>E-Bike Nav Pro - Route Breakdown Analysis</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
@@ -28,17 +28,19 @@
         .input-row i.loc-icon { color: #1a73e8; margin-right: 10px; font-size: 20px; }
         .input-row i.remove-icon { color: #aaa; cursor: pointer; font-size: 20px; margin-left: 5px; }
         .input-row i.remove-icon:hover { color: #ea4335; }
-        .input-row input { border: none; font-size: 15px; outline: none; width: 100%; background: transparent; }
+        .input-row input { border: none; font-size: 14px; font-weight: bold; outline: none; width: 100%; background: transparent; color: #444; }
         
         .action-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 5px 5px 5px; }
         .btn-add-stop { background: none; border: none; color: #1a73e8; font-weight: 800; cursor: pointer; display: flex; align-items: center; font-size: 13px; padding: 5px; }
         .btn-find-route { background: #1a73e8; color: white; border: none; border-radius: 20px; padding: 8px 15px; font-weight: 900; cursor: pointer; box-shadow: 0 2px 8px rgba(26,115,232,0.4); font-size: 13px; }
         
-        .suggestions { position: absolute; top: 100%; left: 0; width: 100%; background: white; border-radius: 0 0 12px 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.3); max-height: 200px; overflow-y: auto; z-index: 1006; display: none; }
+        /* FIXED SUGGESTIONS BOX */
+        .suggestions { position: fixed; background: white; border-radius: 0 0 12px 12px; box-shadow: 0 8px 25px rgba(0,0,0,0.4); max-height: 250px; overflow-y: auto; z-index: 9999; display: none; }
         .suggestion-item { padding: 12px 15px; display: flex; align-items: center; border-bottom: 1px solid #f1f3f4; cursor: pointer; font-size: 14px; }
+        .suggestion-item:hover { background: #f8f9fa; }
         
-        /* E-BIKE DASHBOARD - COLLAPSIBLE */
-        .ebike-dash { position: absolute; top: 120px; left: 15px; width: 180px; background: rgba(255, 255, 255, 0.85); border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); padding: 12px; z-index: 999; backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.6); transition: 0.3s; }
+        /* E-BIKE DASHBOARD */
+        .ebike-dash { position: absolute; top: 120px; right: 15px; width: 180px; background: rgba(255, 255, 255, 0.85); border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); padding: 12px; z-index: 999; backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.6); transition: 0.3s; }
         .dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
         .dash-title { font-size: 13px; font-weight: 900; color: #444; text-transform: uppercase; letter-spacing: 1px; margin: 0; }
         
@@ -69,7 +71,7 @@
         .btn-stop { background: #ea4335; display: none; box-shadow: 0 4px 10px rgba(234, 67, 53, 0.3); }
 
         /* RECENTER BUTTON */
-        .btn-gps { position: absolute; bottom: 120px; right: 15px; width: 45px; height: 45px; background: white; border: none; border-radius: 50%; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; cursor: pointer; color: #1a73e8; z-index: 999; transition: 0.2s; }
+        .btn-gps { position: absolute; bottom: 130px; left: 15px; width: 45px; height: 45px; background: white; border: none; border-radius: 50%; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; cursor: pointer; color: #1a73e8; z-index: 999; transition: 0.2s; }
         
         /* TURN BANNER */
         .turn-banner { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 350px; background: #0b6050; color: white; border-radius: 12px; padding: 12px; z-index: 1001; box-shadow: 0 4px 15px rgba(0,0,0,0.3); display: none; align-items: center; opacity: 0; transition: 0.3s; }
@@ -91,19 +93,20 @@
         .toast { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: white; padding: 12px 25px; border-radius: 30px; z-index: 2000; font-size: 14px; font-weight: bold; display: none; }
         .direction-marker { transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1); transform-origin: center center; }
 
-        @media (orientation: landscape) {
-            .ebike-dash { left: 15px; top: 80px; }
-            .btn-gps { right: 15px; bottom: 120px; }
-            .bottom-panel { width: 320px; left: auto; right: 15px; bottom: 15px; border-radius: 15px; padding: 15px; }
-            .search-panel { top: 15px; left: 15px; transform: none; width: 320px; }
-            .search-panel.hidden { transform: translateY(-150%); }
-            .turn-banner { top: 15px; left: 50%; transform: translateX(-50%); }
-        }
-        
         /* CUSTOM MAP MARKERS FOR STOPS */
-        .stop-marker { padding: 4px 10px; border-radius: 15px; font-weight: bold; font-size: 12px; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.5); white-space: nowrap; transform: translate(-50%, -100%); margin-top: -5px; display: inline-block; }
+        .stop-marker { padding: 5px 12px; border-radius: 15px; font-weight: 900; font-size: 12px; border: 2px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.4); white-space: nowrap; transform: translate(-50%, -100%); margin-top: -5px; display: inline-block; }
         .stop-intermediate { background-color: #fbbc04; color: #111; }
         .stop-final { background-color: #ea4335; color: white; }
+
+        /* LANDSCAPE FIX */
+        @media (orientation: landscape) {
+            .search-panel { top: 15px; left: 15px; transform: none; width: 320px; }
+            .search-panel.hidden { transform: translateY(-150%); }
+            .ebike-dash { top: 15px; right: 15px; left: auto; }
+            .bottom-panel { width: 320px; left: 15px; right: auto; bottom: 15px; border-radius: 15px; padding: 15px; }
+            .btn-gps { right: 15px; bottom: 20px; left: auto; }
+            .turn-banner { top: 15px; left: 50%; transform: translateX(-50%); }
+        }
     </style>
 </head>
 <body>
@@ -114,18 +117,20 @@
         <div id="map"></div>
     </div>
 
-    <!-- SEARCH PANEL MULTI-STOP -->
+    <div class="suggestions" id="suggestions-box"></div>
+
+    <!-- SEARCH PANEL MULTI-STOP WITH LEG-BY-LEG UI -->
     <div class="search-panel" id="search-panel">
         <div class="stops-wrapper" id="stops-wrapper">
             <div class="input-row">
-                <i class="material-icons loc-icon">my_location</i>
-                <input type="text" value="Your Location" readonly>
+                <i class="material-icons loc-icon" style="color: #1a73e8;">my_location</i>
+                <input type="text" value="From: Your Location" readonly style="color: #1a73e8;">
             </div>
             
             <div id="stops-container">
                 <div class="input-row stop-row" style="position: relative;">
                     <i class="material-icons loc-icon" style="color: #ea4335;">location_on</i>
-                    <input type="text" class="dest-input" placeholder="Stop 1 / Destination" oninput="handleSearchInput(this)" onfocus="activeSearchInput = this" autocomplete="off">
+                    <input type="text" class="dest-input" placeholder="To: 1st Destination" oninput="handleSearchInput(this)" onfocus="handleSearchInput(this)" autocomplete="off">
                 </div>
             </div>
         </div>
@@ -134,8 +139,6 @@
             <button class="btn-add-stop" onclick="addStopInput()"><i class="material-icons" style="font-size:16px;">add</i> ADD STOP</button>
             <button class="btn-find-route" onclick="calculateMultiStopRoute()">FIND ROUTE</button>
         </div>
-        
-        <div class="suggestions" id="suggestions-box"></div>
     </div>
 
     <!-- DASHBOARD -->
@@ -166,7 +169,7 @@
             <div class="dash-row" style="font-size: 10px; justify-content: center; color: #555;">(Est. Range: <span id="disp-range">30.0</span> km)</div>
             
             <button class="btn-reset" onclick="resetTripMeter()"><i class="material-icons" style="font-size:14px; vertical-align:middle; margin-right:5px;">refresh</i> RESET</button>
-            <button class="btn-reset" style="background:#1a73e8; margin-top:5px;" onclick="runManualAnalysis()"><i class="material-icons" style="font-size:14px; vertical-align:middle; margin-right:5px;">analytics</i> ANALYSIS</button>
+            <button class="btn-reset" style="background:#1a73e8; margin-top:5px;" onclick="runManualAnalysis()"><i class="material-icons" style="font-size:14px; vertical-align:middle; margin-right:5px;">analytics</i> AI ANALYSIS</button>
         </div>
     </div>
 
@@ -203,16 +206,16 @@
                 <label>Time to Full Charge (Hours)</label>
                 <input type="number" id="charge-time-input" value="6" min="1" step="0.5" onchange="saveState()">
             </div>
-            <p style="font-size: 11px; color: #666; margin-bottom: 15px;">Set the hours required to charge your e-bike from 0% to 100%. This is used for Smart Trip Analysis.</p>
+            <p style="font-size: 11px; color: #666; margin-bottom: 15px;">Ito ang oras na kailangan para ma-full charge ang e-bike mo mula 0%. Ginagamit ito sa AI Analysis para ma-kalkula ang charging time sa destination.</p>
             <button class="modal-btn" onclick="closeChargePlanner()">SAVE</button>
         </div>
     </div>
 
-    <!-- SMART ANALYSIS MODAL -->
+    <!-- SMART ANALYSIS MODAL (WILL CONTAIN BREAKDOWN) -->
     <div class="modal-overlay" id="analysis-modal">
         <div class="modal-box">
-            <div class="modal-title"><i class="material-icons">insights</i> AI Trip Analysis</div>
-            <div class="analysis-text" id="analysis-content">Analyzing route...</div>
+            <div class="modal-title"><i class="material-icons">insights</i> Route Breakdown & AI Analysis</div>
+            <div id="analysis-content" style="width: 100%;"></div>
             <button class="modal-btn close" onclick="closeAnalysis()">CLOSE</button>
         </div>
     </div>
@@ -220,7 +223,6 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
     <script>
-        // AUTO-SAVE LOGIC
         let startBattery = parseFloat(localStorage.getItem('ebike_startBat')) || 100.0;
         let maxRangeLimit = parseFloat(localStorage.getItem('ebike_maxRange')) || 30.0;
         let tripDistance = parseFloat(localStorage.getItem('ebike_tripDist')) || 0.0;
@@ -254,12 +256,10 @@
             }
         }
 
-        // MODALS
         function openChargePlanner() { document.getElementById('planner-modal').style.display = 'flex'; }
         function closeChargePlanner() { document.getElementById('planner-modal').style.display = 'none'; saveState(); }
         function closeAnalysis() { document.getElementById('analysis-modal').style.display = 'none'; }
 
-        // WAKE LOCK
         let wakeLock = null;
         async function requestWakeLock() {
             try { if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); } } catch (err) {}
@@ -269,7 +269,6 @@
             if (wakeLock !== null && document.visibilityState === 'visible') requestWakeLock();
         });
 
-        // MAP INIT
         const map = L.map('map', { zoomControl: false }).setView([14.5995, 121.1713], 16);
         L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 20 }).addTo(map);
 
@@ -288,7 +287,7 @@
         let routingControl = null;
         
         let activeWaypointsList = []; 
-        let activeLegDistances = []; // To store distance to each stop
+        let activeLegDistances = []; 
         let currentWaypointTargetIndex = 1;
         
         let lastTrackedCoords = null;
@@ -326,9 +325,13 @@
             
             const query = inputEl.value;
             const box = document.getElementById('suggestions-box');
+            
             if (query.length < 3) { box.style.display = 'none'; return; }
             
-            inputEl.parentElement.appendChild(box);
+            const rect = inputEl.getBoundingClientRect();
+            box.style.top = rect.bottom + 'px';
+            box.style.left = rect.left + 'px';
+            box.style.width = rect.width + 'px';
             
             clearTimeout(debounce);
             debounce = setTimeout(async () => {
@@ -354,21 +357,48 @@
             }, 500);
         }
 
+        document.addEventListener('click', function(e) {
+            const box = document.getElementById('suggestions-box');
+            if (activeSearchInput && !activeSearchInput.contains(e.target) && !box.contains(e.target)) {
+                box.style.display = 'none';
+            }
+        });
+
+        // UPDATE PLACEHOLDERS TO SHOW SEQUENCE
+        function updatePlaceholders() {
+            const inputs = document.querySelectorAll('.dest-input');
+            inputs.forEach((input, index) => {
+                if(index === 0) {
+                    input.placeholder = "To: 1st Destination";
+                    input.previousElementSibling.innerText = "location_on";
+                    input.previousElementSibling.style.color = "#ea4335";
+                } else {
+                    let num = index + 1;
+                    let suffix = "th";
+                    if(num === 2) suffix = "nd";
+                    if(num === 3) suffix = "rd";
+                    input.placeholder = `Then to: ${num}${suffix} Destination`;
+                    input.previousElementSibling.innerText = "flag";
+                    input.previousElementSibling.style.color = "#fbbc04";
+                }
+            });
+        }
+
         function addStopInput() {
             if(!isDashCollapsed) toggleDashboard(); 
             
             const container = document.getElementById('stops-container');
-            const rowCount = container.querySelectorAll('.stop-row').length + 1;
-            
             const div = document.createElement('div');
             div.className = 'input-row stop-row';
             div.style.position = 'relative';
             div.innerHTML = `
-                <i class="material-icons loc-icon" style="color: #fbbc04;">location_on</i>
-                <input type="text" class="dest-input" placeholder="Stop ${rowCount} / Destination" oninput="handleSearchInput(this)" onfocus="activeSearchInput = this" autocomplete="off">
-                <i class="material-icons remove-icon" onclick="this.parentElement.remove()">close</i>
+                <i class="material-icons loc-icon">flag</i>
+                <input type="text" class="dest-input" placeholder="" oninput="handleSearchInput(this)" onfocus="handleSearchInput(this)" autocomplete="off">
+                <i class="material-icons remove-icon" onclick="this.parentElement.remove(); updatePlaceholders();">close</i>
             `;
             container.appendChild(div);
+            
+            updatePlaceholders();
             
             const wrapper = document.getElementById('stops-wrapper');
             wrapper.scrollTop = wrapper.scrollHeight;
@@ -407,10 +437,9 @@
                 createMarker: function(i, wp, nWps) { 
                     if (i === 0) return null; 
                     
-                    // CUSTOM COLORED MARKERS
                     let isFinal = (i === nWps - 1);
                     let markerClass = isFinal ? 'stop-final' : 'stop-intermediate';
-                    let label = isFinal ? 'DEST' : 'STOP ' + i;
+                    let label = isFinal ? 'FINAL DEST' : 'DEST ' + i;
                     
                     let html = `<div class="stop-marker ${markerClass}">${label}</div>`;
                     
@@ -424,20 +453,21 @@
                 activeRouteDistanceKm = route.summary.totalDistance / 1000;
                 const timeMin = Math.round(route.summary.totalTime / 60);
                 
-                // Calculate distance to each stop for Smart Analysis
                 activeLegDistances = [];
                 let coords = route.coordinates;
                 let wpIndices = route.waypointIndices; 
                 
                 for(let i = 1; i < wpIndices.length; i++) {
                     let dist = 0;
-                    for(let j = wpIndices[0]; j < wpIndices[i]; j++) {
-                        dist += map.distance(coords[j], coords[j+1]);
+                    for(let j = wpIndices[i-1]; j < wpIndices[i]; j++) {
+                        if (coords[j] && coords[j+1]) {
+                            dist += map.distance(coords[j], coords[j+1]);
+                        }
                     }
                     activeLegDistances.push(dist / 1000); 
                 }
                 
-                let stopCountText = wps.length > 2 ? `(${wps.length - 1} Stops) • ` : "";
+                let stopCountText = wps.length > 2 ? `(${wps.length - 1} Destinations) • ` : "";
                 
                 document.getElementById('route-eta').innerText = timeMin + " min";
                 document.getElementById('route-dist').innerText = stopCountText + activeRouteDistanceKm.toFixed(1) + " km • E-Bike Route";
@@ -448,53 +478,67 @@
             }).addTo(map);
         }
 
-        // SMART AI ANALYSIS (WITH MULTI-STOP EVALUATION)
+        // SMART AI ANALYSIS WITH LEG BREAKDOWN
         function runSmartAnalysis(totalDistKm, legDistances) {
             if(!totalDistKm || !legDistances) return;
             const currentRange = (currentLiveBattery / 100) * maxRangeLimit;
             const roundTrip = totalDistKm * 2;
             const kmPerHourCharge = maxRangeLimit / fullChargeHours;
             
-            let analysisText = "";
-            let voiceWarning = "";
             const contentDiv = document.getElementById('analysis-content');
             let isMultiStop = legDistances.length > 1;
+
+            // HTML PARA SA LEG-BY-LEG BREAKDOWN UI
+            let breakdownHtml = `<div style="background:#f1f3f4; padding:12px; border-radius:10px; margin-bottom:15px; border: 1px solid #ddd;">`;
+            breakdownHtml += `<div style="font-size:12px; color:#555; font-weight:900; margin-bottom:8px; text-transform:uppercase;">Route Breakdown:</div>`;
+            for(let i=0; i < legDistances.length; i++) {
+                let fromName = (i === 0) ? "Your Location" : `Dest ${i}`;
+                let toName = (i === legDistances.length - 1) ? "Final Dest" : `Dest ${i+1}`;
+                breakdownHtml += `<div style="font-size:13px; color:#333; margin-bottom:5px; display:flex; align-items:center;"><i class="material-icons" style="font-size:16px; color:#1a73e8; margin-right:8px;">timeline</i> ${fromName} ➔ ${toName}: <b style="margin-left:auto;">${legDistances[i].toFixed(1)} km</b></div>`;
+            }
+            breakdownHtml += `<div style="border-top: 1px solid #ccc; margin-top:8px; padding-top:8px; font-size:14px; font-weight:900; text-align:right;">Total: ${totalDistKm.toFixed(1)} km</div>`;
+            breakdownHtml += `</div>`;
             
+            let analysisText = "";
+            let voiceWarning = "";
+            let analysisClass = "analysis-text";
+
             if (totalDistKm > currentRange) {
                 let reachableStop = -1;
+                let accumulatedDist = 0;
                 
                 if (isMultiStop) {
-                    // Check which stops the user CAN reach
                     for(let i = 0; i < legDistances.length - 1; i++) {
-                        if (currentRange >= legDistances[i]) {
-                            reachableStop = i + 1; // 1-indexed Stop number
+                        accumulatedDist += legDistances[i];
+                        if (currentRange >= accumulatedDist) {
+                            reachableStop = i + 1; 
                         }
                     }
                 }
                 
                 if (reachableStop !== -1) {
-                    analysisText = `WARNING: Your range is not enough for the full trip (${totalDistKm.toFixed(1)} km). However, you CAN safely reach Stop ${reachableStop} (${legDistances[reachableStop-1].toFixed(1)} km). You MUST charge there!`;
-                    voiceWarning = `Warning. Not enough battery for the full trip. You can reach Stop ${reachableStop}. Please charge there to continue.`;
-                    contentDiv.className = "analysis-text warning";
+                    analysisText = `WARNING: Hindi kaya ang buong biyahe. Hanggang Dest ${reachableStop} (${accumulatedDist.toFixed(1)} km) ka lang aabot. Mag-charge muna doon!`;
+                    voiceWarning = `Warning. Not enough battery for the full trip. You can only reach Destination ${reachableStop}. Please charge there.`;
+                    analysisClass = "analysis-text warning";
                 } else {
-                    let firstTarget = isMultiStop ? `Stop 1 (${legDistances[0].toFixed(1)} km)` : `your destination (${totalDistKm.toFixed(1)} km)`;
-                    analysisText = `CRITICAL WARNING: Range (${currentRange.toFixed(1)} km) is too low! You will not reach ${firstTarget}. Please charge now!`;
+                    let firstTarget = isMultiStop ? `Dest 1 (${legDistances[0].toFixed(1)} km)` : `destination (${totalDistKm.toFixed(1)} km)`;
+                    analysisText = `CRITICAL WARNING: Sobrang baba ng battery (${currentRange.toFixed(1)} km range)! Hindi ka aabot sa unang ${firstTarget}. Mag-charge ka na ngayon!`;
                     voiceWarning = "Critical Warning. Destination is out of range. Charge immediately.";
-                    contentDiv.className = "analysis-text warning";
+                    analysisClass = "analysis-text warning";
                 }
             } else if (roundTrip > currentRange) {
                 const deficit = roundTrip - currentRange;
                 const hoursNeeded = (deficit / kmPerHourCharge).toFixed(1);
-                analysisText = `WARNING: You can reach all stops safely, but will not have enough battery to return home. Charge for at least ${hoursNeeded} hours at your stops to make it back.`;
+                analysisText = `WARNING: Aabot ka sa lahat ng pupuntahan, pero malolowbat ka pauwi. Charge nang at least ${hoursNeeded} hours sa destinasyon mo para makabalik.`;
                 voiceWarning = `Warning. Not enough battery for a round trip. Prepare to charge for at least ${hoursNeeded} hours.`;
-                contentDiv.className = "analysis-text warning";
+                analysisClass = "analysis-text warning";
             } else {
-                analysisText = `SAFE: You have enough battery to complete all stops and return home. Estimated remaining range after return: ${(currentRange - roundTrip).toFixed(1)} km.`;
+                analysisText = `SAFE: Sapat ang battery mo balikan! Estimated na matitirang range pag-uwi: ${(currentRange - roundTrip).toFixed(1)} km.`;
                 voiceWarning = "Battery sufficient for a round trip. Safe to proceed.";
-                contentDiv.className = "analysis-text";
+                analysisClass = "analysis-text";
             }
             
-            contentDiv.innerText = analysisText;
+            contentDiv.innerHTML = breakdownHtml + `<div class="${analysisClass}">${analysisText}</div>`;
             document.getElementById('analysis-modal').style.display = 'flex';
             speak(voiceWarning);
         }
@@ -503,11 +547,10 @@
             if(activeRouteDistanceKm > 0 && activeLegDistances.length > 0) {
                 runSmartAnalysis(activeRouteDistanceKm, activeLegDistances);
             } else {
-                alert("Please calculate a route first before analyzing.");
+                alert("Please calculate a route first before running AI analysis.");
             }
         }
 
-        // BATTERY COMPUTATION
         function manualDataUpdate() {
             startBattery = parseFloat(document.getElementById('battery-input').value) || 0;
             if(startBattery > 100) startBattery = 100;
@@ -543,7 +586,6 @@
         }
         updateDashboard();
 
-        // NAVIGATION TOGGLE
         window.toggleNav = function() {
             if(!isNavigating) {
                 isNavigating = true;
@@ -592,7 +634,6 @@
             }
         }
 
-        // LIVE GPS TRACKING
         if (navigator.geolocation) {
             navigator.geolocation.watchPosition(pos => {
                 if(!currentLat) return;
@@ -620,7 +661,6 @@
                         lastSpokenKm = currentIntKm;
                     }
 
-                    // MULTI-STOP ARRIVAL WARNING LOGIC
                     if (activeWaypointsList.length > currentWaypointTargetIndex) {
                         const targetWP = activeWaypointsList[currentWaypointTargetIndex];
                         const d = map.distance([currentLat, currentLng], targetWP); 
@@ -631,15 +671,15 @@
                             if (isFinalStop) {
                                 speak("You are approaching your final destination.");
                             } else {
-                                speak(`You are approaching stop number ${currentWaypointTargetIndex}.`);
+                                speak(`You are approaching Destination ${currentWaypointTargetIndex}.`);
                             }
                             spokenArrivalWarning = true;
                         } else if (d <= 50) {
                             if (isFinalStop) {
                                 speak("You have arrived at your final destination.");
-                                toggleNav(); // Auto end navigation
+                                toggleNav(); 
                             } else {
-                                speak(`You have arrived at stop number ${currentWaypointTargetIndex}. Continuing to next stop.`);
+                                speak(`You have arrived at Destination ${currentWaypointTargetIndex}. Continuing to next route.`);
                                 currentWaypointTargetIndex++;
                                 spokenArrivalWarning = false; 
                             }
@@ -647,7 +687,6 @@
                     }
                 }
 
-                // SMOOTH HEADING LOGIC
                 if(speed > 1 && pos.coords.heading !== null && !isNaN(pos.coords.heading)) {
                     let newHeading = pos.coords.heading;
                     let diff = newHeading - previousHeading;
