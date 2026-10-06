@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>E-Bike Nav Pro - Draggable Pins</title>
+    <title>E-Bike Nav Pro - Smart Routing Override</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
@@ -93,23 +93,24 @@
         .modal-title { font-size: 18px; font-weight: 900; color: #1a73e8; margin-bottom: 18px; display: flex; align-items: center; gap: 10px; }
         .modal-input-group { margin-bottom: 18px; }
         .modal-input-group label { display: block; font-size: 13px; font-weight: 800; color: #444; margin-bottom: 8px; }
-        .modal-input-group input { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 10px; font-size: 15px; font-weight: bold; outline: none; transition: 0.2s; }
-        .modal-input-group input:focus { border-color: #1a73e8; }
+        .modal-input-group input, .modal-input-group select { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 10px; font-size: 15px; font-weight: bold; outline: none; transition: 0.2s; background: white; }
+        .modal-input-group input:focus, .modal-input-group select:focus { border-color: #1a73e8; }
         .modal-btn { background: #1a73e8; color: white; border: none; padding: 12px; border-radius: 10px; width: 100%; font-size: 15px; font-weight: 900; cursor: pointer; box-shadow: 0 4px 12px rgba(26,115,232,0.3); }
         .modal-btn.close { background: #f1f3f4; color: #333; margin-top: 12px; box-shadow: none; }
         .analysis-text { font-size: 15px; line-height: 1.6; font-weight: bold; color: #333; margin-bottom: 18px; }
         .analysis-text.warning { color: #ea4335; }
 
         .toast { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.85); color: white; padding: 15px 30px; border-radius: 30px; z-index: 2000; font-size: 15px; font-weight: bold; display: none; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        
         .direction-marker { transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1); transform-origin: center center; }
 
-        /* DRAGGABLE MAP MARKERS FOR STOPS */
+        /* CUSTOM MAP MARKERS FOR STOPS */
         .marker-wrapper { position: relative; display: flex; flex-direction: column; align-items: center; cursor: grab; pointer-events: auto; }
         .marker-wrapper:active { cursor: grabbing; transform: scale(1.05); }
         .stop-marker { padding: 6px 14px; border-radius: 20px; font-weight: 900; font-size: 13px; border: 3px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.5); white-space: nowrap; transform: translateY(-10px); }
         .stop-intermediate { background-color: #fbbc04; color: #111; }
         .stop-final { background-color: #ea4335; color: white; }
-        .drag-hint { font-size: 10px; color: #fff; background: rgba(0,0,0,0.7); padding: 2px 8px; border-radius: 10px; font-weight: bold; white-space: nowrap; transform: translateY(-5px); box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+        .drag-hint { font-size: 10px; color: #fff; background: rgba(0,0,0,0.8); padding: 3px 8px; border-radius: 10px; font-weight: bold; white-space: nowrap; transform: translateY(-5px); box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
 
         /* LANDSCAPE FIX */
         @media (orientation: landscape) {
@@ -130,7 +131,6 @@
         <div id="map"></div>
     </div>
 
-    <!-- SUGGESTIONS BOX -->
     <div class="suggestions" id="suggestions-box"></div>
 
     <!-- SEARCH PANEL MULTI-STOP WITH LEG-BY-LEG UI -->
@@ -161,7 +161,7 @@
             <h3 class="dash-title">Dashboard</h3>
             <div class="dash-controls">
                 <button class="info-btn" onclick="toggleDashboard()"><i class="material-icons" id="toggle-dash-icon">expand_less</i></button>
-                <button class="info-btn" onclick="openChargePlanner()"><i class="material-icons">info</i></button>
+                <button class="info-btn" onclick="openSettingsPlanner()"><i class="material-icons">settings</i></button>
             </div>
         </div>
         
@@ -212,16 +212,26 @@
         </div>
     </div>
 
-    <!-- CHARGE PLANNER MODAL -->
+    <!-- SETTINGS & PLANNER MODAL -->
     <div class="modal-overlay" id="planner-modal">
         <div class="modal-box">
-            <div class="modal-title"><i class="material-icons">battery_charging_full</i> Charge Settings</div>
+            <div class="modal-title"><i class="material-icons">settings</i> Settings & Planner</div>
+            
+            <div class="modal-input-group">
+                <label>Route Preference (Pag iwas sa kalsada)</label>
+                <select id="route-mode-input" onchange="saveState()">
+                    <option value="bike">Strict E-Bike (Iwas Main Roads)</option>
+                    <option value="car">Standard Vehicle (Dadaan sa lahat)</option>
+                </select>
+                <div style="font-size: 11px; color: #777; margin-top: 5px;">Piliin ang "Standard" kung may alam kang kalsada na ayaw padaanan ng mapa.</div>
+            </div>
+
             <div class="modal-input-group">
                 <label>Time to Full Charge (Hours)</label>
                 <input type="number" id="charge-time-input" value="6" min="1" step="0.5" onchange="saveState()">
             </div>
-            <p style="font-size: 12px; color: #555; margin-bottom: 18px; font-weight: 500; line-height: 1.4;">Ito ang oras na kailangan para ma-full charge ang e-bike mo mula 0%. Ginagamit ito sa AI Analysis para ma-kalkula ang charging time sa destination.</p>
-            <button class="modal-btn" onclick="closeChargePlanner()">SAVE SETTINGS</button>
+            
+            <button class="modal-btn" onclick="closeSettingsPlanner()">SAVE SETTINGS</button>
         </div>
     </div>
 
@@ -241,21 +251,26 @@
         let maxRangeLimit = parseFloat(localStorage.getItem('ebike_maxRange')) || 30.0;
         let tripDistance = parseFloat(localStorage.getItem('ebike_tripDist')) || 0.0;
         let fullChargeHours = parseFloat(localStorage.getItem('ebike_chargeHours')) || 6.0;
+        let routeMode = localStorage.getItem('ebike_routeMode') || 'bike';
         let currentLiveBattery = startBattery;
 
         document.getElementById('battery-input').value = Math.round(startBattery);
         document.getElementById('max-range-input').value = Math.round(maxRangeLimit);
         document.getElementById('charge-time-input').value = fullChargeHours;
+        document.getElementById('route-mode-input').value = routeMode;
 
         function saveState() {
             localStorage.setItem('ebike_startBat', startBattery);
             localStorage.setItem('ebike_maxRange', maxRangeLimit);
             localStorage.setItem('ebike_tripDist', tripDistance);
+            
             fullChargeHours = parseFloat(document.getElementById('charge-time-input').value) || 6.0;
             localStorage.setItem('ebike_chargeHours', fullChargeHours);
+
+            routeMode = document.getElementById('route-mode-input').value;
+            localStorage.setItem('ebike_routeMode', routeMode);
         }
 
-        // SMART DASHBOARD AUTO-HIDE LOGIC
         function activateSearchMode(inputEl) {
             document.getElementById('ebike-dash').classList.add('smart-hidden');
             handleSearchInput(inputEl);
@@ -284,8 +299,8 @@
             }
         }
 
-        function openChargePlanner() { document.getElementById('planner-modal').style.display = 'flex'; }
-        function closeChargePlanner() { document.getElementById('planner-modal').style.display = 'none'; saveState(); }
+        function openSettingsPlanner() { document.getElementById('planner-modal').style.display = 'flex'; }
+        function closeSettingsPlanner() { document.getElementById('planner-modal').style.display = 'none'; saveState(); }
         function closeAnalysis() { document.getElementById('analysis-modal').style.display = 'none'; }
 
         let wakeLock = null;
@@ -483,8 +498,9 @@
             
             routingControl = L.Routing.control({
                 waypoints: wps,
-                router: L.Routing.osrmv1({ serviceUrl: 'https://routing.openstreetmap.de/routed-bike/route/v1' }), 
-                routeWhileDragging: false,
+                // DYNAMIC ROUTING URL BASED ON SETTINGS
+                router: L.Routing.osrmv1({ serviceUrl: `https://routing.openstreetmap.de/routed-${routeMode}/route/v1` }), 
+                routeWhileDragging: false, // Set to false to avoid server flood, we handle dragend manually
                 addWaypoints: false,
                 showAlternatives: true, 
                 altLineOptions: { styles: [{color: '#8ab4f8', opacity: 0.9, weight: 6}] }, 
@@ -496,17 +512,27 @@
                     let markerClass = isFinal ? 'stop-final' : 'stop-intermediate';
                     let label = isFinal ? 'FINAL DEST' : 'DEST ' + i;
                     
-                    // DRAGGABLE MARKER SETUP
                     let html = `
                     <div class="marker-wrapper">
                         <div class="stop-marker ${markerClass}">${label}</div>
                         <div class="drag-hint"><i class="material-icons" style="font-size:10px; vertical-align:middle;">touch_app</i> Drag to move</div>
                     </div>`;
                     
-                    return L.marker(wp.latLng, {
-                        draggable: true, // PINAHIHINTULUTAN ANG DRAG-AND-DROP
+                    let marker = L.marker(wp.latLng, {
+                        draggable: true, 
                         icon: L.divIcon({ className: '', html: html, iconAnchor: [45, 50] })
                     }); 
+                    
+                    // WHEN A MARKER IS DRAGGED AND DROPPED, RE-CALCULATE THE ROUTE
+                    marker.on('dragend', function(e) {
+                        let newLatLng = e.target.getLatLng();
+                        let currentWaypoints = routingControl.getWaypoints();
+                        currentWaypoints[i].latLng = newLatLng;
+                        routingControl.setWaypoints(currentWaypoints); // This auto-triggers routing re-calc
+                        showToast("Re-calculating route...");
+                    });
+                    
+                    return marker;
                 }
             }).on('routesfound', function(e) {
                 hideToast();
@@ -528,11 +554,15 @@
                     activeLegDistances.push(dist / 1000); 
                 }
                 
-                let stopCountText = wps.length > 2 ? `(${wps.length - 1} Destinations) • ` : "";
+                let stopCountText = activeWaypointsList.length > 2 ? `(${activeWaypointsList.length - 1} Destinations) • ` : "";
                 
                 document.getElementById('route-eta').innerText = timeMin + " min";
-                document.getElementById('route-dist').innerText = stopCountText + activeRouteDistanceKm.toFixed(1) + " km • E-Bike Route";
-                map.fitBounds(L.latLngBounds(route.waypoints.map(wp => wp.latLng)), { padding: [40, 40] });
+                document.getElementById('route-dist').innerText = stopCountText + activeRouteDistanceKm.toFixed(1) + " km • " + (routeMode === 'bike' ? "E-Bike Route" : "Standard Route");
+                
+                // Update activeWaypointsList to match newly dragged points
+                activeWaypointsList = routingControl.getWaypoints().map(wp => wp.latLng);
+                
+                // Optional: map.fitBounds(L.latLngBounds(activeWaypointsList), { padding: [40, 40] });
                 
                 runSmartAnalysis(activeRouteDistanceKm, activeLegDistances);
                 document.getElementById('ebike-dash').classList.remove('smart-hidden');
@@ -540,7 +570,7 @@
             }).addTo(map);
         }
 
-        // SMART AI ANALYSIS WITH LEG BREAKDOWN
+        // SMART AI ANALYSIS
         function runSmartAnalysis(totalDistKm, legDistances) {
             if(!totalDistKm || !legDistances) return;
             const currentRange = (currentLiveBattery / 100) * maxRangeLimit;
