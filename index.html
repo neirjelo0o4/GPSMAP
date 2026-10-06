@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>E-Bike Nav Pro - Smart UI & Advanced Search</title>
+    <title>E-Bike Nav Pro - Draggable Pins</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
@@ -43,7 +43,7 @@
         .suggestion-item:active { background: #f0f4f8; }
         .search-loading { padding: 15px; text-align: center; color: #777; font-weight: bold; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 10px; }
         
-        /* SMART E-BIKE DASHBOARD (AUTO-HIDES TO PREVENT OVERLAP) */
+        /* SMART E-BIKE DASHBOARD */
         .ebike-dash { position: absolute; top: 130px; right: 15px; width: 190px; background: rgba(255, 255, 255, 0.9); border-radius: 15px; box-shadow: 0 8px 25px rgba(0,0,0,0.25); padding: 15px; z-index: 999; backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.8); transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1); }
         .ebike-dash.smart-hidden { transform: translateX(120%) !important; opacity: 0; pointer-events: none; }
         
@@ -103,10 +103,13 @@
         .toast { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.85); color: white; padding: 15px 30px; border-radius: 30px; z-index: 2000; font-size: 15px; font-weight: bold; display: none; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
         .direction-marker { transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1); transform-origin: center center; }
 
-        /* CUSTOM MAP MARKERS FOR STOPS */
-        .stop-marker { padding: 6px 14px; border-radius: 20px; font-weight: 900; font-size: 13px; border: 3px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.5); white-space: nowrap; transform: translate(-50%, -100%); margin-top: -5px; display: inline-block; }
+        /* DRAGGABLE MAP MARKERS FOR STOPS */
+        .marker-wrapper { position: relative; display: flex; flex-direction: column; align-items: center; cursor: grab; pointer-events: auto; }
+        .marker-wrapper:active { cursor: grabbing; transform: scale(1.05); }
+        .stop-marker { padding: 6px 14px; border-radius: 20px; font-weight: 900; font-size: 13px; border: 3px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.5); white-space: nowrap; transform: translateY(-10px); }
         .stop-intermediate { background-color: #fbbc04; color: #111; }
         .stop-final { background-color: #ea4335; color: white; }
+        .drag-hint { font-size: 10px; color: #fff; background: rgba(0,0,0,0.7); padding: 2px 8px; border-radius: 10px; font-weight: bold; white-space: nowrap; transform: translateY(-5px); box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
 
         /* LANDSCAPE FIX */
         @media (orientation: landscape) {
@@ -127,10 +130,10 @@
         <div id="map"></div>
     </div>
 
-    <!-- NAKAHIWALAY NA SUGGESTIONS BOX PARA DI MATAKPAN -->
+    <!-- SUGGESTIONS BOX -->
     <div class="suggestions" id="suggestions-box"></div>
 
-    <!-- SEARCH PANEL -->
+    <!-- SEARCH PANEL MULTI-STOP WITH LEG-BY-LEG UI -->
     <div class="search-panel" id="search-panel">
         <div class="stops-wrapper" id="stops-wrapper">
             <div class="input-row">
@@ -343,7 +346,6 @@
         let activeSearchInput = null;
         let debounce;
         
-        // UPGRADED SEARCH ENGINE (PHOTON API WITH LOCATION BIAS FOR BETTER RESULTS)
         function handleSearchInput(inputEl) {
             activeSearchInput = inputEl;
             inputEl.removeAttribute('data-lat');
@@ -357,7 +359,6 @@
                 return; 
             }
             
-            // Positioning fixed box relative to input
             const rect = inputEl.getBoundingClientRect();
             box.style.top = (rect.bottom + 5) + 'px';
             box.style.left = rect.left + 'px';
@@ -369,7 +370,6 @@
             clearTimeout(debounce);
             debounce = setTimeout(async () => {
                 try {
-                    // Photon API gives better local fuzzy search, biased to current location
                     let url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=8`;
                     if(currentLat && currentLng) { url += `&lat=${currentLat}&lon=${currentLng}`; }
                     
@@ -408,7 +408,6 @@
             }, 600);
         }
 
-        // Add Global Keyframe for spinner
         const style = document.createElement('style');
         style.innerHTML = `@keyframes spin { 100% { transform: rotate(360deg); } }`;
         document.head.appendChild(style);
@@ -497,10 +496,16 @@
                     let markerClass = isFinal ? 'stop-final' : 'stop-intermediate';
                     let label = isFinal ? 'FINAL DEST' : 'DEST ' + i;
                     
-                    let html = `<div class="stop-marker ${markerClass}">${label}</div>`;
+                    // DRAGGABLE MARKER SETUP
+                    let html = `
+                    <div class="marker-wrapper">
+                        <div class="stop-marker ${markerClass}">${label}</div>
+                        <div class="drag-hint"><i class="material-icons" style="font-size:10px; vertical-align:middle;">touch_app</i> Drag to move</div>
+                    </div>`;
                     
                     return L.marker(wp.latLng, {
-                        icon: L.divIcon({ className: '', html: html, iconAnchor: [0, 0] })
+                        draggable: true, // PINAHIHINTULUTAN ANG DRAG-AND-DROP
+                        icon: L.divIcon({ className: '', html: html, iconAnchor: [45, 50] })
                     }); 
                 }
             }).on('routesfound', function(e) {
@@ -527,7 +532,7 @@
                 
                 document.getElementById('route-eta').innerText = timeMin + " min";
                 document.getElementById('route-dist').innerText = stopCountText + activeRouteDistanceKm.toFixed(1) + " km • E-Bike Route";
-                map.fitBounds(L.latLngBounds(wps), { padding: [40, 40] });
+                map.fitBounds(L.latLngBounds(route.waypoints.map(wp => wp.latLng)), { padding: [40, 40] });
                 
                 runSmartAnalysis(activeRouteDistanceKm, activeLegDistances);
                 document.getElementById('ebike-dash').classList.remove('smart-hidden');
