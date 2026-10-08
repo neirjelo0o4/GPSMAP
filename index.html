@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#101721">
   <meta name="description" content="Tesla-inspired local-road navigation with OpenStreetMap bicycle navigation with road-first routing.">
-  <title>e-Bike NAV V12 • Tesla Ride Cockpit</title>
+  <title>e-Bike NAV V12.1 • Fixed Visual-Viewport Cockpit</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <!-- Native Leaflet layer rotation: no oversized 200vw map or whole-page CSS rotation. -->
@@ -287,6 +287,179 @@
     body.riding .ui>.dashboard .dash-cell{padding:3px 2px}
     body.riding .ui>.nav-footer{padding:7px}
   }
+
+
+/* V12.1 — real visual-viewport anchored Tesla ride cockpit.
+   This intentionally overrides the old V12 GRID, which on certain mobile Chrome
+   layouts pushes the dashboard beyond the right edge. */
+.ui{
+  position:fixed!important;
+  inset:auto!important;
+  left:var(--nav-visual-left,0px)!important;
+  top:var(--nav-visual-top,0px)!important;
+  width:var(--nav-visual-width,100vw)!important;
+  height:var(--nav-visual-height,100dvh)!important;
+  max-width:none!important;
+  max-height:none!important;
+  overflow:hidden!important;
+  box-sizing:border-box;
+}
+body.riding .ui{
+  display:block!important;
+  padding:0!important;
+  overflow:hidden!important;
+}
+body.riding .ui>.nav-header,
+body.riding .ui>.nav-footer,
+body.riding .ui>.dashboard,
+body.riding .ui>.top-actions,
+body.riding .ui>.recenter,
+body.riding .ui>.status{
+  position:absolute!important;
+  inset:auto!important;
+  transform:none!important;
+  margin:0!important;
+  min-width:0!important;
+  box-sizing:border-box!important;
+  justify-self:auto!important;
+  align-self:auto!important;
+  grid-column:auto!important;
+  grid-row:auto!important;
+}
+/* Both top areas are anchored to the visual viewport, not grid tracks. */
+body.riding .ui>.nav-header{
+  display:flex!important;
+  left:calc(10px + env(safe-area-inset-left))!important;
+  top:calc(10px + env(safe-area-inset-top))!important;
+  width:min(325px,39%)!important;
+  max-width:none!important;
+  max-height:min(110px,33%)!important;
+  padding:11px 13px!important;
+  border-radius:16px!important;
+  overflow:hidden!important;
+}
+body.riding .ui>.nav-header .next-turn{gap:9px!important;min-width:0}
+body.riding .ui>.nav-header .next-turn>div{min-width:0;flex:1}
+body.riding .ui>.nav-header .next-turn .mi{font-size:30px!important;flex-shrink:0}
+body.riding .ui>.nav-header .turn-main{font-size:clamp(14px,2.5vw,21px)!important;line-height:1.1;max-width:100%!important}
+body.riding .ui>.nav-header .turn-minor{max-width:100%!important;text-overflow:ellipsis;overflow:hidden;white-space:nowrap}
+body.riding .ui>.top-actions{
+  display:flex!important;flex-wrap:nowrap!important;align-items:start!important;
+  width:auto!important;max-width:calc(100% - 28px)!important;
+  right:calc(10px + env(safe-area-inset-right))!important;
+  top:calc(10px + env(safe-area-inset-top))!important;
+  left:auto!important;bottom:auto!important;
+  gap:6px!important;
+}
+body.riding .ui>.top-actions .round{
+  width:38px!important;height:38px!important;min-width:38px!important;
+  border-radius:12px!important;flex:0 0 38px!important;
+}
+/* Clear bottom band: ETA on left, full dashboard on right. */
+body.riding .ui>.nav-footer{
+  display:flex!important;
+  left:calc(10px + env(safe-area-inset-left))!important;
+  right:auto!important;
+  bottom:calc(10px + env(safe-area-inset-bottom))!important;
+  top:auto!important;
+  width:min(510px,calc(100% - 180px - env(safe-area-inset-left) - env(safe-area-inset-right)))!important;
+  max-width:none!important;
+  padding:10px 12px!important;
+  border-radius:16px!important;
+  gap:8px!important;
+  align-items:center!important;
+  overflow:hidden!important;
+}
+body.riding .ui>.nav-footer .nav-metric{flex:1 1 0!important;min-width:0!important;overflow:hidden!important}
+body.riding .ui>.nav-footer .nav-metric b{font-size:clamp(12px,1.8vw,18px)!important;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.riding .ui>.nav-footer .nav-metric span{font-size:8px!important;white-space:nowrap;letter-spacing:0!important}
+body.riding .ui>.nav-footer .round{flex:0 0 34px!important;width:34px!important;height:34px!important;border-radius:11px!important}
+body.riding .ui>.dashboard{
+  display:block!important;
+  right:calc(10px + env(safe-area-inset-right))!important;
+  left:auto!important;
+  bottom:calc(10px + env(safe-area-inset-bottom))!important;
+  top:auto!important;
+  width:145px!important;
+  max-width:145px!important;
+  padding:8px 9px 9px!important;
+  border-radius:15px!important;
+  overflow:hidden!important;
+}
+body.riding .ui>.dashboard .dash-title{display:none!important}
+body.riding .ui>.dashboard .speed{font-size:38px!important;padding-top:0!important;letter-spacing:-2px!important;line-height:1!important}
+body.riding .ui>.dashboard .speed-unit{display:block!important;font-size:8px!important;letter-spacing:1px!important;margin:2px 0 6px!important}
+body.riding .ui>.dashboard .dash-cells{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:4px!important}
+body.riding .ui>.dashboard .dash-cell{padding:5px 4px!important;border-radius:8px!important;min-width:0!important}
+body.riding .ui>.dashboard .dash-cell span{font-size:7px!important;overflow:hidden!important;white-space:nowrap!important;letter-spacing:0!important}
+body.riding .ui>.dashboard .dash-cell strong{font-size:10px!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;margin-top:2px!important}
+body.riding .ui>.recenter{
+  display:grid!important;place-items:center!important;
+  right:calc(10px + env(safe-area-inset-right))!important;
+  left:auto!important;
+  top:auto!important;
+  bottom:calc(152px + env(safe-area-inset-bottom))!important;
+  width:38px!important;height:38px!important;
+}
+body.riding .ui>.status{
+  right:calc(10px + env(safe-area-inset-right))!important;
+  left:auto!important;
+  top:calc(58px + env(safe-area-inset-top))!important;
+  bottom:auto!important;
+  width:min(220px,35%)!important;
+  max-width:none!important;
+  max-height:100px!important;
+  overflow:auto!important;
+  font-size:10px!important;
+}
+body.riding .ui>.status:not(.gps-alert):not(.route-alert){display:none!important}
+/* Landscape phones have room for the map. Avoid panel collisions regardless
+   of Android browser toolbar height; dock at visual-viewport corners. */
+@media(orientation:landscape) and (max-height:500px){
+  body.riding .ui>.nav-header{width:min(315px,38%)!important;max-height:min(90px,33%)!important;padding:10px 12px!important}
+  body.riding .ui>.nav-header .turn-main{font-size:clamp(13px,2.3vw,20px)!important}
+  body.riding .ui>.top-actions .round{height:34px!important;width:34px!important;min-width:34px!important;flex-basis:34px!important}
+  body.riding .ui>.dashboard{width:135px!important;max-width:135px!important;padding:7px!important}
+  body.riding .ui>.dashboard .speed{font-size:32px!important}
+  body.riding .ui>.dashboard .speed-unit{margin:1px 0 3px!important}
+  body.riding .ui>.dashboard .dash-cell{padding:4px 3px!important}
+  body.riding .ui>.nav-footer{width:min(510px,calc(100% - 166px - env(safe-area-inset-left) - env(safe-area-inset-right)))!important;padding:9px 10px!important;gap:5px!important}
+  body.riding .ui>.nav-footer .nav-metric b{font-size:clamp(11px,1.65vw,17px)!important}
+  body.riding .ui>.nav-footer .round{width:32px!important;height:32px!important;flex-basis:32px!important}
+  body.riding .ui>.recenter{bottom:calc(144px + env(safe-area-inset-bottom))!important;width:34px!important;height:34px!important}
+  body.riding .ui>.status{top:calc(52px + env(safe-area-inset-top))!important}
+}
+@media(orientation:landscape) and (max-width:670px){
+  body.riding .ui>.nav-header{width:min(240px,40%)!important;padding:9px!important}
+  body.riding .ui>.nav-header .turn-main{font-size:14px!important}
+  body.riding .ui>.dashboard{width:123px!important;max-width:123px!important}
+  body.riding .ui>.nav-footer{width:calc(100% - 151px - env(safe-area-inset-left) - env(safe-area-inset-right))!important}
+  body.riding .ui>.nav-footer .round{width:28px!important;height:28px!important;flex-basis:28px!important}
+  body.riding .ui>.nav-footer .nav-metric b{font-size:12px!important}
+  body.riding .ui>.recenter{bottom:calc(138px + env(safe-area-inset-bottom))!important}
+}
+/* Portrait: top turn card, tools right; compact dash above full-width ETA. */
+@media(orientation:portrait){
+  body.riding .ui>.nav-header{width:calc(100% - 116px - env(safe-area-inset-left) - env(safe-area-inset-right))!important;max-height:126px!important;padding:11px!important}
+  body.riding .ui>.nav-header .turn-main{font-size:clamp(14px,4vw,20px)!important}
+  body.riding .ui>.top-actions{display:grid!important;grid-template-columns:repeat(2,38px)!important;gap:5px!important}
+  body.riding .ui>.top-actions .round{width:38px!important;height:38px!important;min-width:38px!important}
+  body.riding .ui>.nav-footer{width:calc(100% - 20px - env(safe-area-inset-left) - env(safe-area-inset-right))!important;max-width:none!important}
+  body.riding .ui>.dashboard{bottom:calc(85px + env(safe-area-inset-bottom))!important;width:136px!important;max-width:136px!important}
+  body.riding .ui>.recenter{bottom:calc(99px + env(safe-area-inset-bottom))!important;right:calc(154px + env(safe-area-inset-right))!important}
+  body.riding .ui>.status{right:auto!important;left:calc(10px + env(safe-area-inset-left))!important;top:calc(140px + env(safe-area-inset-top))!important;width:min(210px,50%)!important}
+}
+/* Very narrow portrait: footer info cannot grow beyond its own width. */
+@media(orientation:portrait) and (max-width:360px){
+  body.riding .ui>.nav-header{width:calc(100% - 110px - env(safe-area-inset-left) - env(safe-area-inset-right))!important}
+  body.riding .ui>.top-actions{grid-template-columns:repeat(2,35px)!important}
+  body.riding .ui>.top-actions .round{width:35px!important;min-width:35px!important;height:35px!important}
+  body.riding .ui>.nav-footer{gap:3px!important;padding:9px!important}
+  body.riding .ui>.nav-footer .round{flex-basis:29px!important;width:29px!important;height:29px!important}
+  body.riding .ui>.nav-footer .nav-metric b{font-size:12px!important}
+  body.riding .ui>.dashboard{width:122px!important;max-width:122px!important}
+  body.riding .ui>.recenter{right:calc(138px + env(safe-area-inset-right))!important}
+}
 
 </style>
 </head>
@@ -801,6 +974,25 @@ window.addEventListener('resize',()=>{
     if(state.map){state.map.invalidateSize({pan:false});if(state.gps)follow(true)}
   },180);
 },{passive:true});
+function syncVisibleCockpitViewport(){
+  const vv=window.visualViewport;
+  const w=vv?vv.width:window.innerWidth;
+  const h=vv?vv.height:window.innerHeight;
+  const x=vv?vv.offsetLeft:0;
+  const y=vv?vv.offsetTop:0;
+  const style=document.documentElement.style;
+  if(Number.isFinite(w)&&w>0)style.setProperty('--nav-visual-width',w+'px');
+  if(Number.isFinite(h)&&h>0)style.setProperty('--nav-visual-height',h+'px');
+  if(Number.isFinite(x))style.setProperty('--nav-visual-left',x+'px');
+  if(Number.isFinite(y))style.setProperty('--nav-visual-top',y+'px');
+}
+syncVisibleCockpitViewport();
+window.addEventListener('resize',syncVisibleCockpitViewport,{passive:true});
+window.addEventListener('orientationchange',syncVisibleCockpitViewport,{passive:true});
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize',syncVisibleCockpitViewport,{passive:true});
+  window.visualViewport.addEventListener('scroll',syncVisibleCockpitViewport,{passive:true});
+}
 startGPS();
 if(state.map&&state.routes.length){try{state.selected=0;redrawRoutes();drawChoices();chooseRoute(0);if(state.startPoint&&state.destPoint)ensureReturnRoute()}catch(err){console.error('Route restore error:',err)}}
 })();
