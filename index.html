@@ -410,6 +410,15 @@
         @media (prefers-color-scheme: dark) { .route-choice-note { color:rgba(255,255,255,.45); } }
         body.route-nav-active .route-choice-panel, body.free-nav-active .route-choice-panel { display:none !important; }
 
+
+        /* V5.4 Google Maps handoff: no API key required, lightweight control */
+        .google-route-actions { display:flex; gap:8px; margin-top:9px; align-items:stretch; }
+        .btn-google-route { flex:1 1 auto; border:1px solid rgba(79,163,255,.45); background:rgba(28,91,164,.88); color:#fff; border-radius:13px; padding:11px 9px; font-size:12px; font-weight:800; letter-spacing:.1px; cursor:pointer; display:flex; gap:6px; align-items:center; justify-content:center; }
+        .btn-google-route i { font-size:19px; }
+        .btn-google-route:active { transform:scale(.98); }
+        .btn-local-route { flex:0 1 auto; min-width:102px; border:1px solid rgba(255,255,255,.14); background:rgba(17,22,28,.78); color:#fff; border-radius:13px; padding:10px 12px; font-size:11px; font-weight:700; cursor:pointer; }
+        .google-route-hint { margin:7px 0 0; color:rgba(255,255,255,.64); font-size:10px; line-height:1.4; }
+        body.route-nav-active .google-route-actions, body.free-nav-active .google-route-actions, body.route-nav-active #google-bottom-link, body.free-nav-active #google-bottom-link {display:none !important;}
     </style>
 </head>
 <body>
@@ -440,8 +449,13 @@
         
         <div class="action-row">
             <button class="btn-add-stop" onclick="addStopInput()"><i class="material-icons" style="font-size:18px;">add_circle</i> ADD STOP</button>
-            <button class="btn-find-route" onclick="calculateMultiStopRoute()">FIND ROUTE</button>
+            <span style="font-size:11px;font-weight:750;opacity:.75">ROUTE OPTIONS</span>
         </div>
+        <div class="google-route-actions">
+            <button class="btn-google-route" onclick="openGoogleMapsRoute()"><i class="material-icons">map</i> GOOGLE MAPS ROUTES</button>
+            <button class="btn-local-route" onclick="calculateMultiStopRoute()">IN-APP (BETA)</button>
+        </div>
+        <p class="google-route-hint">Google Maps opens separately with Avoid tolls + highways requested. Review the route and signs before riding; avoidance is not guaranteed.</p>
     </div>
 
     <!-- TESLA-STYLE DRIVE CARD -->
@@ -488,10 +502,11 @@
         <div>
             <div class="route-title" id="route-eta">Free Ride Mode</div>
             <div class="route-desc" id="route-dist">GPS Tracking & Trip Meter</div>
-            <div class="route-policy" id="route-policy">NO TOLL • CAR ROUTES ONLY</div>
+            <div class="route-policy" id="route-policy">NO TOLL INTENDED • VERIFY ROADS</div>
         </div>
         <div class="route-choice-panel" id="route-choice-panel"></div>
-        <div class="route-choice-note" id="route-choice-note">Choose a route before starting. Local-road option avoids motorway/expressway when available.</div>
+        <div class="route-choice-note" id="route-choice-note">Review roads carefully before riding. Public map data may be incomplete.</div>
+        <button class="google-bottom-link" id="google-bottom-link" onclick="openGoogleMapsRoute()" style="width:100%;border:1px solid rgba(79,163,255,.30);border-radius:12px;padding:9px;background:rgba(13,37,65,.84);color:#bce0ff;font-weight:750;cursor:pointer">OPEN GOOGLE MAPS ROUTE CHOICES ↗</button>
         <button class="btn-start" id="btn-start" onclick="toggleNav()">
             <i class="material-icons">navigation</i> START RIDE
         </button>
@@ -804,7 +819,7 @@
                 document.getElementById('route-eta').innerText = 'Free Ride Mode';
                 document.getElementById('route-dist').innerText = 'GPS Tracking & Trip Meter';
                 const policyEl = document.getElementById('route-policy');
-                if (policyEl) policyEl.innerText = 'NO TOLL • CAR ROUTES ONLY';
+                if (policyEl) policyEl.innerText = 'NO TOLL INTENDED • VERIFY ROADS';
                 document.body.classList.remove('route-nav-active');
                 document.body.classList.remove('free-nav-active');
             }
@@ -987,6 +1002,48 @@
             wrapper.scrollTop = wrapper.scrollHeight;
             savePlannerState();
         }
+
+
+        // V5.4: Google Maps URLs (no API key). This OPENS Google Maps;
+        // it cannot embed Google's route engine or certify toll-free road legality.
+        window.openGoogleMapsRoute = function() {
+            const inputEls = Array.from(document.querySelectorAll('.dest-input'));
+            const stops = inputEls.map(el => {
+                const typed = (el.value || '').trim();
+                if (!typed) return null;
+                const lat = Number(el.dataset.lat);
+                const lng = Number(el.dataset.lng);
+                if (el.dataset.lat && el.dataset.lng && Number.isFinite(lat) && Number.isFinite(lng)) {
+                    return `${lat.toFixed(6)},${lng.toFixed(6)}`;
+                }
+                // Search terms work in Google Maps even if Photon did not offer a suggestion.
+                return typed;
+            }).filter(Boolean);
+
+            if (!stops.length) {
+                showToast('Ilagay muna ang destination. Kahit text lang, puwede sa Google Maps.');
+                setTimeout(hideToast, 3200);
+                return;
+            }
+            try { savePlannerState(); } catch (_) {}
+            const url = new URL('https://www.google.com/maps/dir/');
+            url.searchParams.set('api', '1');
+            url.searchParams.set('destination', stops[stops.length - 1]);
+            url.searchParams.set('travelmode', 'driving');
+            url.searchParams.set('avoid', 'tolls,highways');
+            if (Number.isFinite(currentLat) && Number.isFinite(currentLng)) {
+                url.searchParams.set('origin', `${currentLat.toFixed(6)},${currentLng.toFixed(6)}`);
+            }
+            if (stops.length > 1) url.searchParams.set('waypoints', stops.slice(0, -1).join('|'));
+            // No dir_action=navigate: let the rider review Google's alternative routes first.
+            const link = document.createElement('a');
+            link.href = url.toString();
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        };
 
         function createStrictNoTollRouter() {
             // Official OSRM demo endpoint using the driving profile.
@@ -1246,7 +1303,7 @@
                 if (isLocal) title = 'Local Roads';
                 else if (Math.abs(sec - minTime) < 1) title = 'Fastest No Toll';
                 else if (Math.abs(Number(r?.summary?.totalDistance || 0) - minDist) < 1) title = 'Shortest No Toll';
-                const badge = isLocal ? 'NO TOLL • NO MOTORWAY' : 'STRICT NO TOLL';
+                const badge = isLocal ? 'LOCAL ROAD REQUEST • VERIFY' : 'AVOID TOLL REQUEST • VERIFY';
                 return `<button class="route-choice-card ${i === selectedRouteChoiceIndex ? 'selected' : ''}" onclick="chooseRouteFromCard(${i})">
                     <div class="route-choice-top"><div class="route-choice-title">${title}</div><div class="route-choice-eta">${mins} min</div></div>
                     <div class="route-choice-meta">${km.toFixed(km >= 10 ? 0 : 1)} km</div>
@@ -1401,7 +1458,7 @@
                 }
 
                 if (routes.length > 1 && !options.resumeNavigation && !wasRecalculating) {
-                    showToast(`${routes.length} strict NO-TOLL routes found • checking local-road option…`);
+                    showToast(`${routes.length} in-app routes • verify toll/highway restrictions before travel`);
                     setTimeout(hideToast, 2200);
                 }
 
@@ -1430,8 +1487,8 @@
                 isRecalculating = false;
                 const policyEl = document.getElementById('route-policy');
                 if (policyEl) policyEl.innerText = 'NO TOLL • NO ROUTE FOUND';
-                showToast("Walang valid NO-TOLL car route, o unavailable ang routing server.");
-                speak("No valid no toll driving route was found. Toll roads will not be used.", true);
+                showToast("In-app routing unavailable. Tap GOOGLE MAPS ROUTES to view route choices.");
+                speak("In app routing is unavailable. You can check routes in Google Maps.", true);
                 setTimeout(hideToast, 4200);
             }).addTo(map);
         }
