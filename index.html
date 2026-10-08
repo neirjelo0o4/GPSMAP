@@ -14,11 +14,16 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Material+Symbols+Rounded:FILL@0..1&display=swap" rel="stylesheet">
   <style>
-    :root{--bg:#0c131b;--glass:rgba(12,19,28,.76);--line:rgba(255,255,255,.13);--muted:#a7b7c9;--blue:#4ba6ff;--white:#f8fbff;--safe:#4de0a4;--warn:#ffbe63;--shadow:0 16px 50px rgba(0,0,0,.35)}
+    :root{--bg:#0c131b;--glass:rgba(12,19,28,.76);--line:rgba(255,255,255,.13);--muted:#a7b7c9;--blue:#4ba6ff;--white:#f8fbff;--safe:#4de0a4;--warn:#ffbe63;--shadow:0 16px 50px rgba(0,0,0,.35);--nav-bottom-offset:13px;--pseudo3d-tilt:12deg;--pseudo3d-scale:1.11}
     *{box-sizing:border-box}html,body{height:100%;width:100%;margin:0;overflow:hidden;font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;color:var(--white);background:#e8eef4;-webkit-tap-highlight-color:transparent}
     button,input{font:inherit}button{border:0;cursor:pointer;touch-action:manipulation}input{min-width:0}button:disabled{opacity:.45;cursor:not-allowed}
     .mi{font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;display:inline-block;line-height:1;white-space:nowrap;letter-spacing:normal;font-size:23px;font-feature-settings:'liga';-webkit-font-smoothing:antialiased}
-    #free-map{position:absolute;inset:0;z-index:1;background:#e4ebf2}
+    #free-map{position:absolute;inset:0;z-index:1;background:#e4ebf2;transition:transform .45s ease,filter .35s ease;transform-origin:50% 70%;will-change:transform;overflow:hidden}
+    body.riding.pseudo3d #free-map{transform:perspective(1300px) rotateX(var(--pseudo3d-tilt)) scale(var(--pseudo3d-scale));filter:saturate(1.03) contrast(1.02)}
+    #free-map::before,#free-map::after{content:'';position:absolute;left:0;right:0;z-index:450;pointer-events:none}
+    #free-map::before{top:0;height:24vh;background:linear-gradient(to bottom,rgba(7,10,14,.18),rgba(7,10,14,0))}
+    #free-map::after{bottom:0;height:32vh;background:linear-gradient(to top,rgba(4,8,12,.36),rgba(4,8,12,0))}
+    body:not(.riding) #free-map::after{height:18vh;background:linear-gradient(to top,rgba(4,8,12,.16),rgba(4,8,12,0))}
     .ui{position:fixed;inset:0;pointer-events:none;z-index:9;overflow:hidden}
     .ui>*{pointer-events:auto}.glass{background:var(--glass);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:21px;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
     .appmark{position:absolute;left:15px;top:calc(13px + env(safe-area-inset-top));padding:8px 12px 8px 10px;display:flex;align-items:center;gap:9px;font-size:12px;font-weight:800;letter-spacing:.4px}
@@ -61,8 +66,34 @@
     .toast{position:fixed;z-index:30;top:48%;left:50%;transform:translate(-50%,-50%);padding:13px 17px;border-radius:13px;color:#fff;background:#172231e9;box-shadow:var(--shadow);max-width:min(360px,90vw);text-align:center;font-size:12px;line-height:1.55;font-weight:700;display:none;pointer-events:none}
     .scrim{position:fixed;inset:0;z-index:50;background:#080c13be;display:grid;place-items:center;padding:15px}.setup{width:min(490px,100%);background:#111b28;border:1px solid #ffffff24;border-radius:25px;box-shadow:0 25px 60px #0009;padding:25px;color:white;max-height:94vh;overflow-y:auto}.setup-icon{width:47px;height:47px;border-radius:14px;background:#16395a;display:grid;place-items:center;color:#8bc9ff}.setup h1{font-size:23px;line-height:1.25;margin:17px 0 9px}.setup p{color:#b5c7d8;line-height:1.6;font-size:12px;margin:0 0 14px}.setup label{display:block;color:#d4e3f2;font-size:11px;font-weight:800;margin:15px 0 7px}.setup input{width:100%;background:#0b121c;border:1px solid #41546a;border-radius:12px;color:white;font:600 13px Inter,sans-serif;padding:13px}.setup .primary{width:100%;padding:14px;margin-top:12px}.setup a{color:#95caff}.disclaimer{font-size:11px;line-height:1.65;border-left:3px solid #ffbd62;padding:10px 13px;background:#ffffff09;border-radius:5px;color:#d8e3ee}.error-note{color:#ffb7ac;font-size:11px;min-height:14px;margin-top:7px}
     .sheet{display:none;position:fixed;z-index:40;inset:0;background:#070c13a4;align-items:center;justify-content:center;padding:16px}.sheet.open{display:flex}.sheet-panel{width:min(430px,100%);padding:20px;background:#142030;border:1px solid #ffffff20;border-radius:22px;box-shadow:var(--shadow)}.sheet-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:15px;font-weight:900}.setting{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;font-size:12px;border-bottom:1px solid #ffffff13}.setting input{width:75px;border:1px solid #ffffff35;border-radius:9px;background:#090f18;color:white;padding:10px;font-size:12px}.setting small{display:block;color:#aac1d7;margin-top:3px}.setting select{color:white;background:#090f18;border:1px solid #ffffff35;padding:10px;border-radius:8px}
-    @media(max-width:640px){.planning{top:calc(69px + env(safe-area-inset-top));padding:12px}.route-options{top:calc(310px + env(safe-area-inset-top));max-height:24vh}.dashboard{width:158px;bottom:calc(106px + env(safe-area-inset-bottom));right:10px;padding:12px}.speed{font-size:52px}.dash-cell strong{font-size:12px}.recenter{bottom:calc(291px + env(safe-area-inset-bottom))}.status{top:calc(65px + env(safe-area-inset-top));right:10px;max-width:135px}.nav-header{padding:14px}.turn-main{font-size:20px}.nav-footer{padding:12px;gap:8px}.nav-metric b{font-size:17px}}
-    @media(max-height:620px) and (orientation:landscape){.planning{top:70px;max-width:340px}.route-options{left:365px;top:70px;max-height:45vh}.dashboard{right:12px;bottom:15px}.bottom{max-width:360px;left:15px;transform:none;bottom:15px}.nav-footer{left:15px;transform:none;max-width:430px;bottom:13px}.nav-header{max-width:380px}.recenter{right:180px;bottom:20px}.status{top:18px;right:120px}}
+    @media(max-width:640px){.planning{top:calc(69px + env(safe-area-inset-top));padding:12px}.route-options{top:calc(310px + env(safe-area-inset-top));max-height:24vh}.dashboard{width:158px;bottom:calc(106px + env(safe-area-inset-bottom));right:10px;padding:12px}.speed{font-size:52px}.dash-cell strong{font-size:12px}.recenter{bottom:calc(291px + env(safe-area-inset-bottom))}.status{top:calc(65px + env(safe-area-inset-top));right:10px;max-width:135px}.nav-header{padding:14px}.turn-main{font-size:20px;max-width:220px}.nav-footer{padding:12px;gap:8px}.nav-metric b{font-size:17px}}
+    @media(orientation:landscape) and (max-height:700px){
+      .appmark{display:none}
+      .top-actions{top:calc(12px + env(safe-area-inset-top));right:12px}
+      body.riding .top-actions{top:calc(12px + env(safe-area-inset-top))}
+      .planning{top:calc(12px + env(safe-area-inset-top));left:12px;width:min(320px,42vw);max-height:calc(100vh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));overflow:auto;padding:12px}
+      .route-options{left:calc(min(320px,42vw) + 24px);top:calc(12px + env(safe-area-inset-top));width:min(270px,32vw);max-height:calc(100vh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}
+      .place-results{left:12px;top:calc(186px + env(safe-area-inset-top));width:min(320px,42vw);max-height:42vh}
+      .dashboard{right:12px;bottom:calc(12px + env(safe-area-inset-bottom));width:156px;padding:10px 11px}
+      .bottom{left:12px;transform:none;bottom:calc(12px + env(safe-area-inset-bottom));width:min(350px,45vw);padding:10px}
+      .trip-summary b{font-size:14px}.trip-summary span{font-size:9px}
+      .start{padding:12px 13px}
+      .status{top:auto;bottom:calc(92px + env(safe-area-inset-bottom));right:12px;max-width:156px}
+      .recenter{right:178px;bottom:calc(16px + env(safe-area-inset-bottom))}
+      .nav-header{top:calc(12px + env(safe-area-inset-top));left:12px;width:min(335px,43vw);padding:13px 14px}
+      .turn-main{font-size:18px;max-width:200px}.turn-minor{font-size:10px}
+      .nav-header .next-turn .mi{font-size:34px}
+      .nav-footer{left:12px;transform:none;bottom:calc(12px + env(safe-area-inset-bottom));width:min(420px,56vw);padding:11px 12px;gap:9px}
+      .nav-metric b{font-size:16px}.nav-metric span{font-size:8px}
+      body.riding .dashboard{right:12px;bottom:calc(12px + env(safe-area-inset-bottom));width:146px}
+      body.riding .recenter{right:172px;bottom:calc(16px + env(safe-area-inset-bottom))}
+    }
+    @media(orientation:landscape) and (max-height:430px){
+      .round{width:40px;height:40px;border-radius:12px}.top-actions{gap:6px}
+      .planning{width:min(295px,40vw);padding:11px}.route-options{left:calc(min(295px,40vw) + 22px);width:min(250px,30vw)}
+      .dashboard{width:146px}.speed{font-size:46px}.dash-cell strong{font-size:11px}
+      .nav-header{width:min(305px,40vw)}.nav-footer{width:min(390px,54vw)}
+    }
     .place-results{position:absolute;top:calc(245px + env(safe-area-inset-top));left:14px;width:min(370px,calc(100vw - 28px));display:none;padding:5px;z-index:12;max-height:38vh;overflow:auto}
   .place-result{width:100%;text-align:left;color:white;background:transparent;border-bottom:1px solid #ffffff24;padding:12px 10px;font-size:12px;line-height:1.3}
   .place-result:last-child{border:0}.place-result:active{background:#ffffff22}
@@ -84,10 +115,10 @@
   @media(max-height:620px) and (orientation:landscape){.route-options{top:70px;left:365px;max-height:45vh}.planning{max-height:72vh}.place-results{top:180px}}
 </style>
 </head>
-<body>
+<body class="pseudo3d">
   <div id="free-map" aria-label="OpenStreetMap bicycle navigation with route choices"></div>
   <div class="ui">
-    <div class="appmark glass"><i class="mi">electric_moped</i><div>e-MOTO NAV<em>FREE OSM • TESLA UI</em></div></div>
+    <div class="appmark glass"><i class="mi">electric_moped</i><div>e-MOTO NAV<em>FREE OSM • TESLA 3D-LITE UI</em></div></div>
     <div class="top-actions"><button class="round heading-on" id="orientation-btn" title="Direction up (tap for north up)" aria-label="Toggle map orientation"><i class="mi" id="orientation-icon">explore</i></button><button class="round voice-action" id="voice-check" title="Voice round-trip battery check" aria-label="Speak round-trip battery estimate"><i class="mi">record_voice_over</i></button><button class="round" id="settings-btn" title="Settings"><i class="mi">tune</i></button><button class="round" id="audio-btn" title="Mute or unmute"><i class="mi" id="audio-icon">volume_up</i></button></div>
     <section class="planning glass" id="planning">
       <div class="field-label">Starting location • saved for the return trip</div>
@@ -120,6 +151,7 @@
     <div class="setting"><div>0–100% charge time (hours)<small>Used for voice charging-time estimates</small></div><input id="charge-setting" type="number" min="1" max="24" step="0.5" value="8"></div>
     <div class="setting"><div>Direction-up map<small>Rotates to your direction while riding; stationary = hold last heading</small></div><input type="checkbox" id="direction-setting" checked style="width:20px;height:20px;accent-color:#409bff"></div>
     <div class="setting"><div>Camera zoom<small>Tesla wide recommended</small></div><select id="zoom-setting"><option value="wide">Tesla wide</option><option value="far">Far ahead</option><option value="near">Near</option></select></div>
+    <div class="setting"><div>3D-like navigation view<small>Tilted map while riding for easier look-ahead</small></div><input type="checkbox" id="pseudo3d-setting" checked style="width:20px;height:20px;accent-color:#409bff"></div>
     <div class="setting"><div>Automatic Free Ride<small>Begins after stable GPS movement</small></div><input type="checkbox" id="autoride-setting" checked style="width:20px;height:20px;accent-color:#409bff"></div>
     <div class="setting"><div>Reset trip meter</div><button class="ghost" id="reset-trip">RESET</button></div>
     <div class="setting"><div>Minimum mapped road width<small>Only where tagged in OpenStreetMap</small></div><input id="width-setting" type="number" min="1.5" max="5" step="0.1" value="2.2"></div>
@@ -149,7 +181,7 @@ const state={
   riding:false,mode:'free',autoRide:prior.autoRide!==false,muted:!!prior.muted,
   batteryStart:clamp(Number.isFinite(+prior.batteryStart)?+prior.batteryStart:100,0,100),
   fullRange:Math.max(1,+prior.fullRange||35),tripM:Math.max(0,+prior.tripM||0),
-  bikeWidth:Math.max(1.5,+prior.bikeWidth||2.2),zoom:prior.zoomStyle||'wide',directionUp:prior.directionUp!==false,
+  bikeWidth:Math.max(1.5,+prior.bikeWidth||2.2),zoom:prior.zoomStyle||'wide',directionUp:prior.directionUp!==false,pseudo3d:prior.pseudo3d!==false,
   speedKph:0,heading:null,headingAt:0,progress:0,nextTurn:0,voiceMarks:new Set(),moveCount:0,
   lastSave:0,lastCamera:0,lastReroute:0,offRouteCount:0,overviewUntil:0,
   geocoding:false,safetyBusy:false,routingBusy:false,lastLocationAt:0,rerouteCycle:0,
@@ -181,7 +213,7 @@ function save(force=false){const now=Date.now();if(!force&&now-state.lastSave<70
  returnMeters:state.returnMeters,returnKey:state.returnKey,fullChargeHours:state.fullChargeHours,
  batteryUncertain:state.batteryUncertain,lastHiddenAt:state.lastHiddenAt,
  route:route?{...route,points:route.points.map(p=>({lat:+p.lat.toFixed(5),lng:+p.lng.toFixed(5)}))}:null,
- batteryStart:state.batteryStart,fullRange:state.fullRange,tripM:state.tripM,autoRide:state.autoRide,muted:state.muted,zoomStyle:state.zoom,bikeWidth:state.bikeWidth,directionUp:state.directionUp,riding:state.riding,mode:state.mode,savedAt:Date.now()}));}catch(_){}}
+ batteryStart:state.batteryStart,fullRange:state.fullRange,tripM:state.tripM,autoRide:state.autoRide,muted:state.muted,zoomStyle:state.zoom,bikeWidth:state.bikeWidth,directionUp:state.directionUp,pseudo3d:state.pseudo3d,riding:state.riding,mode:state.mode,savedAt:Date.now()}));}catch(_){}}
 function dash(){const b=battery();$('speed').textContent=Math.round(state.speedKph);$('battery').textContent=`${Math.round(b)}%`;$('range').textContent=`${num(b/100*state.fullRange)} km`;$('trip').textContent=`${num(state.tripM/1000)} km`;}
 function initMap(){state.map=L.map('free-map',{zoomControl:false,preferCanvas:true,zoomSnap:.25,zoomDelta:.5,rotate:true,bearing:0,touchRotate:false,dragRotate:false,rotateControl:false}).setView([14.6,121.17],15.5);
  if(typeof state.map.setBearing==='function')state.map.on('rotate',syncArrowOrientation);
@@ -368,6 +400,9 @@ function refreshOrientationButton(){
  $('orientation-btn').classList.toggle('heading-on',enabled);
  $('orientation-btn').title=enabled?'Direction-up ON • Tap for north-up':'North-up ON • Tap for direction-up';
  $('direction-setting').checked=enabled;
+}
+function applyPseudo3d(){
+ document.body.classList.toggle('pseudo3d',!!state.pseudo3d);
 }
 function applyRideOrientation(){
  if(!state.map||!state.riding||!state.directionUp||Date.now()<state.overviewUntil)return;
@@ -556,7 +591,7 @@ function follow(force=false){if(!state.map||!state.gps)return;const now=Date.now
  if(state.riding)applyRideOrientation();else resetMapOrientation();}
 function overview(){const r=state.routes[state.selected];if(!r){follow(true);return}state.overviewUntil=Date.now()+9000;routeBounds();toast('Full route • returns to direction-up in 9 sec')}
 function bind(){
- $('destination').value=state.dest;updateStartLabel();$('battery-setting').value=Math.round(battery());$('range-setting').value=state.fullRange;$('charge-setting').value=state.fullChargeHours;$('autoride-setting').checked=state.autoRide;$('width-setting').value=state.bikeWidth;$('zoom-setting').value=state.zoom;refreshOrientationButton();$('audio-icon').textContent=state.muted?'volume_off':'volume_up';dash();
+ $('destination').value=state.dest;updateStartLabel();$('battery-setting').value=Math.round(battery());$('range-setting').value=state.fullRange;$('charge-setting').value=state.fullChargeHours;$('autoride-setting').checked=state.autoRide;$('width-setting').value=state.bikeWidth;$('zoom-setting').value=state.zoom;$('pseudo3d-setting').checked=state.pseudo3d;refreshOrientationButton();applyPseudo3d();$('audio-icon').textContent=state.muted?'volume_off':'volume_up';dash();
  $('destination').addEventListener('input',()=>{state.searchId++;$('place-results').style.display='none';state.dest=$('destination').value;state.destPoint=null;clearRoutes(false);if(state.pin){state.map.removeLayer(state.pin);state.pin=null;}save(true)});
  $('destination').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();findRoutes()}});
  $('find-route').addEventListener('click',()=>findRoutes());$('use-current-start').addEventListener('click',useGPSStart);$('clear-start').addEventListener('click',removeSavedStart);$('voice-check').addEventListener('click',()=>voiceBatteryReport(true));
@@ -567,12 +602,12 @@ function bind(){
  $('recenter').addEventListener('click',()=>{if(!state.gps||Date.now()-state.lastLocationAt>25000)startGPS();state.overviewUntil=0;follow(true)});$('overview').addEventListener('click',overview);
  $('status').addEventListener('click',()=>{if(window.isSecureContext===false){toast('GPS needs HTTPS. Publish this HTML on Cloudflare Pages / GitHub Pages instead of opening it as a local file.',8500);return;}startGPS();toast('Requesting GPS again…',2000)});
  $('orientation-btn').addEventListener('click',()=>{state.directionUp=!state.directionUp;refreshOrientationButton();if(!state.directionUp)resetMapOrientation();else{state.overviewUntil=0;follow(true)}toast(state.directionUp?'Direction-up map enabled':'North-up map enabled');save(true)});
- $('settings-btn').addEventListener('click',()=>{$('battery-setting').value=Math.round(battery());$('charge-setting').value=state.fullChargeHours;$('settings-sheet').classList.add('open')});$('close-settings').addEventListener('click',()=>{$('settings-sheet').classList.remove('open')});
+ $('settings-btn').addEventListener('click',()=>{$('battery-setting').value=Math.round(battery());$('charge-setting').value=state.fullChargeHours;$('direction-setting').checked=state.directionUp;$('pseudo3d-setting').checked=state.pseudo3d;$('zoom-setting').value=state.zoom;$('autoride-setting').checked=state.autoRide;$('width-setting').value=state.bikeWidth;$('settings-sheet').classList.add('open')});$('close-settings').addEventListener('click',()=>{$('settings-sheet').classList.remove('open')});
  $('settings-sheet').addEventListener('click',e=>{if(e.target===$('settings-sheet'))$('settings-sheet').classList.remove('open')});
  $('audio-btn').addEventListener('click',()=>{state.muted=!state.muted;if(state.muted&&window.speechSynthesis)speechSynthesis.cancel();$('audio-icon').textContent=state.muted?'volume_off':'volume_up';save(true)});
  $('save-settings').addEventListener('click',()=>{const oldWidth=state.bikeWidth;const newBattery=clamp(Number($('battery-setting').value),0,100);
  if(Number.isFinite(newBattery)&&Math.abs(newBattery-battery())>0.75){state.batteryStart=newBattery;state.tripM=0;state.batteryUncertain=false;}
- state.fullRange=Math.max(1,+$('range-setting').value||35);state.fullChargeHours=clamp(+$('charge-setting').value||8,1,24);state.bikeWidth=Math.max(1.5,+$('width-setting').value||2.2);state.zoom=$('zoom-setting').value;state.directionUp=$('direction-setting').checked;if(!state.directionUp)resetMapOrientation();else if(state.riding){state.overviewUntil=0;follow(true);}refreshOrientationButton();state.autoRide=$('autoride-setting').checked;const widthChanged=Math.abs(oldWidth-state.bikeWidth)>.05&&state.routes.length;if(widthChanged)clearRoutes(false);dash();save(true);$('settings-sheet').classList.remove('open');toast(widthChanged?'Width changed • Tap FIND ROUTES again':'Settings saved',widthChanged?4000:2800);});
+ state.fullRange=Math.max(1,+$('range-setting').value||35);state.fullChargeHours=clamp(+$('charge-setting').value||8,1,24);state.bikeWidth=Math.max(1.5,+$('width-setting').value||2.2);state.zoom=$('zoom-setting').value;state.directionUp=$('direction-setting').checked;state.pseudo3d=$('pseudo3d-setting').checked;if(!state.directionUp)resetMapOrientation();else if(state.riding){state.overviewUntil=0;follow(true);}refreshOrientationButton();applyPseudo3d();state.autoRide=$('autoride-setting').checked;const widthChanged=Math.abs(oldWidth-state.bikeWidth)>.05&&state.routes.length;if(widthChanged)clearRoutes(false);dash();save(true);$('settings-sheet').classList.remove('open');toast(widthChanged?'Width changed • Tap FIND ROUTES again':'Settings saved',widthChanged?4000:2800);});
  $('reset-trip').addEventListener('click',()=>{state.batteryStart=battery();state.tripM=0;state.batteryUncertain=false;$('battery-setting').value=state.batteryStart;dash();save(true);toast('Trip meter reset')});
  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')state.lastHiddenAt=Date.now();
  if(document.visibilityState==='visible'&&state.riding&&state.lastHiddenAt&&Date.now()-state.lastHiddenAt>60000){state.batteryUncertain=true;toast('Trip tracking may have paused • update actual battery for accurate estimates',5500);}
