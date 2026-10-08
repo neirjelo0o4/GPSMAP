@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>E-Motorcycle Nav Pro - Voice Navigation</title>
+    <title>E-Motorcycle Nav Pro - Tesla Smooth</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
-    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.13.0/dist/maplibre-gl.css" />
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     
     <style>
@@ -15,7 +14,7 @@
         body { margin: 0; padding: 0; overflow: hidden; background: #111; color: #333; }
         
         #map-wrapper { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; overflow: hidden; background: #222; }
-        #map { position: absolute; top: -50vh; left: -50vw; width: 200vw; height: 200vh; z-index: 1; transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1); transform-origin: center center; }
+        #map { position: absolute; inset: 0; width: 100vw; height: 100vh; z-index: 1; transform: none; }
         .leaflet-routing-container { display: none !important; }
         
         /* SEARCH PANEL (NASA TAAS) */
@@ -133,6 +132,168 @@
             .btn-gps { right: 15px; bottom: 15px; left: auto; }
             .turn-banner { top: 15px; left: 50%; transform: translateX(-50%); }
         }
+
+
+        /* === V3 TESLA / PERFORMANCE UI === */
+        :root {
+            --glass: rgba(12, 14, 18, 0.78);
+            --glass-strong: rgba(9, 11, 14, 0.88);
+            --glass-soft: rgba(22, 25, 30, 0.72);
+            --line: rgba(255,255,255,0.13);
+            --text: #f5f7fa;
+            --muted: rgba(238,242,247,0.62);
+            --accent: #3ea6ff;
+            --green: #63d391;
+            --danger: #ff625f;
+        }
+
+        body { background:#0b0d10; color:var(--text); }
+        #map-wrapper { background:#d9dde0; }
+        #map {
+            top:0 !important;
+            left:0 !important;
+            width:100vw !important;
+            height:100vh !important;
+            transform:none !important;
+            transition:none !important;
+            will-change:auto;
+        }
+        .leaflet-tile { image-rendering:auto; }
+
+        /* Keep blur modest: still glassy without hammering mobile GPUs. */
+        .search-panel,
+        .ebike-dash,
+        .bottom-panel,
+        .btn-gps,
+        .turn-banner,
+        .modal-box,
+        .suggestions {
+            background:var(--glass) !important;
+            border:1px solid var(--line) !important;
+            box-shadow:0 14px 34px rgba(0,0,0,.24) !important;
+            backdrop-filter:blur(8px) saturate(115%) !important;
+            -webkit-backdrop-filter:blur(8px) saturate(115%) !important;
+        }
+
+        .search-panel { max-width:430px; border-radius:20px; padding:10px 13px; }
+        .input-row { border-color:rgba(255,255,255,.09); }
+        .input-row input { color:var(--text) !important; font-weight:600; }
+        .input-row input::placeholder { color:rgba(255,255,255,.48); }
+        .input-row i.loc-icon { color:var(--accent) !important; }
+        .btn-add-stop { color:#cfeaff; font-weight:700; }
+        .btn-find-route,
+        .btn-start,
+        .modal-btn { background:#f4f6f8 !important; color:#111317 !important; box-shadow:none !important; font-weight:800; }
+        .btn-stop { background:rgba(255,78,75,.92) !important; color:#fff !important; }
+        .suggestion-item { color:var(--text); border-color:rgba(255,255,255,.08); }
+        .suggestion-item:active { background:rgba(255,255,255,.09); }
+        .search-loading { color:var(--muted); }
+
+        .ebike-dash {
+            width:210px;
+            bottom:132px;
+            right:12px;
+            border-radius:22px;
+            padding:14px;
+            color:var(--text);
+            overflow:hidden;
+            contain:layout paint;
+        }
+        .dash-header { margin:0 0 10px; }
+        .dash-kicker { font-size:9px; letter-spacing:1.6px; font-weight:700; color:var(--muted); }
+        .dash-title { color:var(--text); font-size:20px; line-height:1; text-transform:none; letter-spacing:-.4px; margin:3px 0 0; font-weight:650; }
+        .dash-controls { gap:7px; }
+        .info-btn {
+            width:29px; height:29px;
+            background:rgba(255,255,255,.08) !important;
+            color:#fff;
+            border:1px solid rgba(255,255,255,.09);
+            box-shadow:none;
+        }
+        .info-btn:active { background:rgba(255,255,255,.15) !important; }
+        #dash-content { transition:max-height .22s ease; max-height:520px; }
+
+        .speed-cluster {
+            display:flex; flex-direction:column; align-items:center; justify-content:center;
+            padding:6px 0 12px;
+            border-bottom:1px solid rgba(255,255,255,.09);
+        }
+        .speed-value { color:#fff !important; font-size:42px !important; font-weight:500 !important; letter-spacing:-2px; line-height:1; }
+        .speed-value span { font-size:11px !important; letter-spacing:.2px; color:var(--muted); font-weight:600; margin-left:2px; }
+        .speed-label { margin-top:6px; font-size:8px; letter-spacing:1.2px; color:var(--muted); font-weight:700; }
+
+        .tesla-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; padding:11px 0; }
+        .tesla-stat { min-width:0; text-align:center; }
+        .tesla-stat .stat-label { display:block; font-size:8px; letter-spacing:.7px; color:var(--muted); font-weight:700; margin-bottom:4px; }
+        .tesla-stat strong { display:block; color:#fff; font-size:15px; font-weight:650; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .tesla-stat small { display:block; margin-top:2px; color:rgba(255,255,255,.42); font-size:8px; }
+        .tesla-stat .dash-val.red { color:var(--danger); }
+
+        .tesla-config { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-top:1px; }
+        .tesla-config label {
+            display:flex; flex-direction:column; gap:4px; padding:7px 8px;
+            border-radius:11px; background:rgba(255,255,255,.055);
+            color:var(--muted); font-size:8px; letter-spacing:.4px; font-weight:700;
+        }
+        .tesla-config label span { display:flex; align-items:center; gap:2px; color:#fff; font-size:10px; letter-spacing:0; }
+        .tesla-config input {
+            width:45px; padding:0; border:0; outline:0; background:transparent;
+            color:#fff; font-size:14px; font-weight:650; text-align:left;
+        }
+
+        .dash-actions { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-top:9px; }
+        .tesla-action {
+            border:1px solid rgba(255,255,255,.08); background:rgba(255,255,255,.075); color:#fff;
+            border-radius:12px; min-height:39px; display:flex; align-items:center; justify-content:center; gap:6px;
+            font-size:10px; font-weight:700; cursor:pointer;
+        }
+        .tesla-action i { font-size:16px; }
+        .tesla-action.danger { color:#ff8b88; }
+        .tesla-action:active { background:rgba(255,255,255,.14); transform:scale(.98); }
+
+        .bottom-panel {
+            width:calc(100% - 20px); left:10px; bottom:10px;
+            border-radius:20px; padding:12px 14px 13px;
+            background:var(--glass-strong) !important;
+        }
+        .route-title { color:#fff; font-size:18px; font-weight:650; letter-spacing:-.2px; }
+        .route-desc { color:var(--muted); font-size:11px; font-weight:500; margin-top:2px; }
+        .btn-start { min-height:45px; padding:10px 14px; border-radius:14px; font-size:14px; }
+
+        .btn-gps { bottom:138px; left:12px; width:44px; height:44px; color:#fff; border-radius:14px; background:var(--glass-strong) !important; }
+        .turn-banner { background:rgba(10,13,16,.88) !important; border-radius:18px; padding:13px 16px; }
+        .turn-banner i { color:var(--accent); }
+        .turn-text { font-size:18px; font-weight:650; }
+
+        .modal-overlay { background:rgba(0,0,0,.48); backdrop-filter:none; -webkit-backdrop-filter:none; }
+        .modal-box { background:rgba(13,15,19,.94) !important; color:#fff; }
+        .modal-title { color:#fff; font-weight:650; }
+        .modal-input-group label, .setting-toggle label { color:var(--muted); }
+        .modal-input-group input { background:rgba(255,255,255,.07); color:#fff; border:1px solid rgba(255,255,255,.12); }
+        .modal-box p { color:rgba(255,255,255,.58) !important; }
+        .slider { background:rgba(255,255,255,.14); }
+        .switch input:checked + .slider { background:#fff; }
+        .switch input:checked + .slider:before { background:#111; }
+
+        .toast { background:rgba(9,11,14,.91); border:1px solid rgba(255,255,255,.12); box-shadow:0 12px 28px rgba(0,0,0,.25); }
+        .stop-marker { border-width:2px; box-shadow:0 4px 10px rgba(0,0,0,.25); }
+        .drag-hint { display:none; }
+        .direction-marker { transition:transform .18s linear; }
+        .leaflet-control-attribution { background:rgba(10,12,15,.68) !important; color:rgba(255,255,255,.62) !important; backdrop-filter:none !important; -webkit-backdrop-filter:none !important; }
+        .leaflet-control-attribution a { color:#d8eaff !important; }
+
+        @media (max-width:420px) {
+            .ebike-dash { width:190px; padding:12px; }
+            .speed-value { font-size:36px !important; }
+            .tesla-stat strong { font-size:14px; }
+        }
+        @media (orientation:landscape) {
+            .search-panel { background:var(--glass) !important; }
+            .ebike-dash { right:12px; bottom:12px; }
+            .bottom-panel { width:330px; left:12px; bottom:12px; border-radius:20px; }
+            .btn-gps { right:232px; left:auto; bottom:12px; }
+        }
+
     </style>
 </head>
 <body>
@@ -167,35 +328,40 @@
         </div>
     </div>
 
-    <!-- SMART DASHBOARD -->
+    <!-- TESLA-STYLE DRIVE CARD -->
     <div class="ebike-dash" id="ebike-dash">
         <div class="dash-header">
-            <h3 class="dash-title">Dashboard</h3>
+            <div>
+                <div class="dash-kicker">E-MOTORCYCLE</div>
+                <h3 class="dash-title">Drive</h3>
+            </div>
             <div class="dash-controls">
-                <button class="info-btn" onclick="toggleDashboard()"><i class="material-icons" id="toggle-dash-icon">expand_less</i></button>
-                <button class="info-btn" onclick="openSettingsPlanner()"><i class="material-icons">settings</i></button>
+                <button class="info-btn" aria-label="Collapse dashboard" onclick="toggleDashboard()"><i class="material-icons" id="toggle-dash-icon">expand_less</i></button>
+                <button class="info-btn" aria-label="Settings" onclick="openSettingsPlanner()"><i class="material-icons">tune</i></button>
             </div>
         </div>
         
         <div id="dash-content">
-            <div class="bat-input-group">
-                START BAT: 
-                <div><input type="number" id="battery-input" value="100" max="100" min="0" onchange="manualDataUpdate()"> %</div>
+            <div class="speed-cluster">
+                <span class="speed-value" id="disp-speed">0 <span>km/h</span></span>
+                <span class="speed-label">CURRENT SPEED</span>
             </div>
-            <div class="bat-input-group" style="margin-bottom: 12px;">
-                MAX RANGE: 
-                <div><input type="number" id="max-range-input" value="30" min="1" onchange="manualDataUpdate()"> km</div>
+
+            <div class="tesla-stats">
+                <div class="tesla-stat"><span class="stat-label">TRIP</span><strong id="disp-trip">0.00</strong><small>km</small></div>
+                <div class="tesla-stat"><span class="stat-label">BATTERY</span><strong class="dash-val" id="disp-bat">100%</strong><small>live</small></div>
+                <div class="tesla-stat"><span class="stat-label">RANGE</span><strong id="disp-range">30.0</strong><small>km est.</small></div>
             </div>
-            
-            <hr style="border: 0; border-top: 2px solid rgba(0,0,0,0.08); margin: 10px 0;">
-            
-            <div class="dash-row">SPD: <span class="dash-val" id="disp-speed">0 <span style="font-size:12px;">km/h</span></span></div>
-            <div class="dash-row">TRIP: <span class="dash-val" id="disp-trip">0.00</span></div>
-            <div class="dash-row">LIVE BAT: <span class="dash-val" id="disp-bat">100%</span></div>
-            <div class="dash-row" style="font-size: 11px; justify-content: center; color: #666;">(Est. Range: <span id="disp-range">30.0</span> km)</div>
-            
-            <button class="btn-reset" onclick="resetTripMeter()"><i class="material-icons" style="font-size:16px; vertical-align:middle; margin-right:5px;">refresh</i> RESET TRIP</button>
-            <button class="btn-reset" style="background:#1a73e8; margin-top:8px;" onclick="runManualAnalysis()"><i class="material-icons" style="font-size:16px; vertical-align:middle; margin-right:5px;">volume_up</i> VOICE RANGE CHECK</button>
+
+            <div class="tesla-config">
+                <label>START BAT <span><input type="number" id="battery-input" value="100" max="100" min="0" onchange="manualDataUpdate()">%</span></label>
+                <label>MAX RANGE <span><input type="number" id="max-range-input" value="30" min="1" onchange="manualDataUpdate()">km</span></label>
+            </div>
+
+            <div class="dash-actions">
+                <button class="tesla-action danger" onclick="resetTripMeter()"><i class="material-icons">restart_alt</i><span>Reset</span></button>
+                <button class="tesla-action" onclick="runManualAnalysis()"><i class="material-icons">volume_up</i><span>Range</span></button>
+            </div>
         </div>
     </div>
 
@@ -247,8 +413,6 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/maplibre-gl@6.13.0/dist/maplibre-gl.js"></script>
-    <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.1.4/leaflet-maplibre-gl.js"></script>
     <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
     <script>
         let startBattery = parseFloat(localStorage.getItem('ebike_startBat')) || 100.0;
@@ -263,6 +427,9 @@
         let autoMotionConfirmations = 0;
         let autoMotionAnchor = null;
         let autoStartCooldownUntil = 0;
+        let lastStatePersistAt = 0;
+        let lastMapFollowAt = 0;
+        let lastRouteDeviationCheckAt = 0;
 
         document.getElementById('battery-input').value = Math.round(startBattery);
         document.getElementById('max-range-input').value = Math.round(maxRangeLimit);
@@ -348,25 +515,24 @@
         window.addEventListener('beforeunload', saveState);
         window.addEventListener('pageshow', () => setTimeout(() => map.invalidateSize(), 150));
 
-        const map = L.map('map', { zoomControl: false, zoomSnap: 0.5, zoomDelta: 0.5 }).setView([14.5995, 121.1713], 15.5);
+        // PERFORMANCE MODE: lightweight Leaflet raster map.
+        // Keeping the map north-up and rotating only the vehicle arrow is much smoother on phones.
+        const map = L.map('map', {
+            zoomControl: false,
+            zoomSnap: 0.25,
+            zoomDelta: 0.5,
+            preferCanvas: true,
+            fadeAnimation: false,
+            markerZoomAnimation: false
+        }).setView([14.5995, 121.1713], 15.25);
 
-        // Crisp OpenStreetMap-based vector basemap with automatic raster fallback.
-        try {
-            if (typeof L.maplibreGL === 'function') {
-                L.maplibreGL({
-                    style: 'https://tiles.openfreemap.org/styles/liberty',
-                    interactive: false,
-                    attribution: 'OpenFreeMap © OpenMapTiles Data from OpenStreetMap'
-                }).addTo(map);
-            } else {
-                throw new Error('MapLibre bridge unavailable');
-            }
-        } catch (e) {
-            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
-                attribution: '&copy; OpenStreetMap contributors'
-            }).addTo(map);
-        }
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            updateWhenIdle: true,
+            updateWhenZooming: false,
+            keepBuffer: 3,
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
 
         const navArrowIcon = L.divIcon({
             html: `<svg class="direction-marker" id="nav-arrow" width="56" height="56" viewBox="0 0 100 100">
@@ -409,7 +575,7 @@
                 currentLat = pos.coords.latitude;
                 currentLng = pos.coords.longitude;
                 updateMarker();
-                map.setView([currentLat, currentLng], isNavigating ? 18 : 16.5, {animate: true});
+                map.setView([currentLat, currentLng], isNavigating ? 17.25 : 16, {animate: false});
                 hideToast();
                 maybeRestoreRouteAndRide();
             }, err => {
@@ -813,7 +979,7 @@
                 
                 map.dragging.disable();
                 map.touchZoom.disable();
-                map.setView([currentLat, currentLng], 18, {animate: true});
+                map.setView([currentLat, currentLng], 17.25, {animate: false});
                 
                 if(activeWaypointsList.length > 1) {
                     if (!silentStart) speak("Motorcycle navigation started. Follow the route.", true);
@@ -837,11 +1003,11 @@
                 
                 map.dragging.enable();
                 map.touchZoom.enable();
-                document.getElementById('map').style.transform = `rotate(0deg)`;
+                document.getElementById('map').style.transform = 'none';
                 const arrowEl = document.getElementById('nav-arrow');
                 if(arrowEl) { arrowEl.style.transform = `rotate(0deg)`; }
                 
-                map.setZoom(16.5, {animate: true});
+                map.setZoom(16, {animate: false});
                 if (!silentEnd) speak("Navigation ended.", true);
                 autoStartCooldownUntil = Date.now() + 15000;
                 savePlannerState();
@@ -892,7 +1058,10 @@
                 maybeAutoStartFromMovement(pos, speed);
 
                 if(isNavigating) {
-                    map.panTo([currentLat, currentLng], {animate: true, duration: 0.5});
+                    if (Date.now() - lastMapFollowAt > 650) {
+                        lastMapFollowAt = Date.now();
+                        map.panTo([currentLat, currentLng], {animate: false});
+                    }
                     
                     if(lastTrackedCoords) {
                         const movedMeters = map.distance(lastTrackedCoords, [currentLat, currentLng]);
@@ -901,8 +1070,11 @@
                         // Ignore GPS jitter and impossible jumps. This keeps the trip meter stable while stopped.
                         if (accuracy <= 50 && movedMeters >= 3 && movedMeters <= 250) {
                             tripDistance += movedMeters / 1000;
-                            saveState(); 
                             updateDashboard();
+                            if (Date.now() - lastStatePersistAt > 5000) {
+                                lastStatePersistAt = Date.now();
+                                saveState();
+                            }
                             lastTrackedCoords = {lat: currentLat, lng: currentLng};
                         } else if (movedMeters > 250) {
                             // Re-anchor after a GPS jump without charging the jump to trip distance.
@@ -919,12 +1091,14 @@
                     }
 
                     // OFF-ROUTE AUTO RECALCULATION
-                    if (activeRouteCoords.length > 0 && !isRecalculating) {
+                    if (activeRouteCoords.length > 0 && !isRecalculating && (Date.now() - lastRouteDeviationCheckAt) > 1800) {
+                        lastRouteDeviationCheckAt = Date.now();
                         let isOffRoute = true;
                         let minOffDist = Infinity;
                         let currentLL = L.latLng(currentLat, currentLng);
 
-                        for(let i=0; i<activeRouteCoords.length; i++) {
+                        const routeSampleStep = Math.max(1, Math.floor(activeRouteCoords.length / 450));
+                        for(let i=0; i<activeRouteCoords.length; i += routeSampleStep) {
                             let dist = map.distance(currentLL, activeRouteCoords[i]);
                             if (dist < 50) { // SAFE: Within 50 meters of the blue line
                                 isOffRoute = false;
@@ -986,14 +1160,8 @@
                     accumulatedRotation += diff;
                     previousHeading = newHeading;
                     
-                    if(isNavigating) {
-                        document.getElementById('map').style.transform = `rotate(${-accumulatedRotation}deg)`;
-                        const arrowEl = document.getElementById('nav-arrow');
-                        if(arrowEl) { arrowEl.style.transform = `rotate(${accumulatedRotation}deg)`; }
-                    } else {
-                        const arrowEl = document.getElementById('nav-arrow');
-                        if(arrowEl) { arrowEl.style.transform = `rotate(${accumulatedRotation}deg)`; }
-                    }
+                    const arrowEl = document.getElementById('nav-arrow');
+                    if(arrowEl) { arrowEl.style.transform = `rotate(${accumulatedRotation}deg)`; }
                 }
             }, err => {}, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }); 
         }
