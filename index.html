@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>E-Bike Nav Pro - Auto-Recalc & Alternatives</title>
+    <title>E-Motorcycle Nav Pro - Voice Navigation</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
@@ -43,7 +43,7 @@
         .suggestion-item:active { background: #f0f4f8; }
         .search-loading { padding: 15px; text-align: center; color: #777; font-weight: bold; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 10px; }
         
-        /* E-BIKE DASHBOARD (NASA IBABA PARA HINDI MAG-OVERLAP) */
+        /* E-MOTORCYCLE DASHBOARD */
         .ebike-dash { position: absolute; bottom: 130px; right: 15px; width: 175px; background: rgba(255, 255, 255, 0.9); border-radius: 15px; box-shadow: 0 8px 25px rgba(0,0,0,0.25); padding: 12px; z-index: 999; backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.8); transition: all 0.3s ease; }
         .ebike-dash.smart-hidden { transform: translateX(120%) !important; opacity: 0; pointer-events: none; }
         
@@ -183,7 +183,7 @@
             <div class="dash-row" style="font-size: 11px; justify-content: center; color: #666;">(Est. Range: <span id="disp-range">30.0</span> km)</div>
             
             <button class="btn-reset" onclick="resetTripMeter()"><i class="material-icons" style="font-size:16px; vertical-align:middle; margin-right:5px;">refresh</i> RESET TRIP</button>
-            <button class="btn-reset" style="background:#1a73e8; margin-top:8px;" onclick="runManualAnalysis()"><i class="material-icons" style="font-size:16px; vertical-align:middle; margin-right:5px;">analytics</i> AI ANALYSIS</button>
+            <button class="btn-reset" style="background:#1a73e8; margin-top:8px;" onclick="runManualAnalysis()"><i class="material-icons" style="font-size:16px; vertical-align:middle; margin-right:5px;">volume_up</i> VOICE RANGE CHECK</button>
         </div>
     </div>
 
@@ -221,17 +221,8 @@
                 <label>Time to Full Charge (Hours)</label>
                 <input type="number" id="charge-time-input" value="6" min="1" step="0.5" onchange="saveState()">
             </div>
-            <p style="font-size: 12px; color: #555; margin-bottom: 18px; font-weight: 500; line-height: 1.4;">Ito ang oras na kailangan para ma-full charge ang e-bike mo mula 0%. Ginagamit ito sa AI Analysis para ma-kalkula ang charging time sa destination.</p>
+            <p style="font-size: 12px; color: #555; margin-bottom: 18px; font-weight: 500; line-height: 1.4;">Ito ang oras na kailangan para ma-full charge ang electric motorcycle mo mula 0%. Ginagamit ito para sa voice-only battery at charging guidance.</p>
             <button class="modal-btn" onclick="closeSettingsPlanner()">SAVE SETTINGS</button>
-        </div>
-    </div>
-
-    <!-- SMART ANALYSIS MODAL -->
-    <div class="modal-overlay" id="analysis-modal">
-        <div class="modal-box" style="max-width: 380px;">
-            <div class="modal-title"><i class="material-icons">insights</i> Route Breakdown & AI</div>
-            <div id="analysis-content" style="width: 100%;"></div>
-            <button class="modal-btn close" onclick="closeAnalysis()">CLOSE</button>
         </div>
     </div>
 
@@ -284,7 +275,6 @@
 
         function openSettingsPlanner() { document.getElementById('planner-modal').style.display = 'flex'; }
         function closeSettingsPlanner() { document.getElementById('planner-modal').style.display = 'none'; saveState(); }
-        function closeAnalysis() { document.getElementById('analysis-modal').style.display = 'none'; }
 
         let wakeLock = null;
         async function requestWakeLock() {
@@ -324,6 +314,14 @@
         let lastSpokenKm = 0;
         let spokenArrivalWarning = false;
         let activeRouteDistanceKm = 0;
+
+        // TURN-BY-TURN VOICE STATE
+        let activeInstructions = [];
+        let currentInstructionIndex = 0;
+        let announcedInstructionKey = "";
+        let lastOffRouteRecalcAt = 0;
+        let lastSpeechText = "";
+        let lastSpeechAt = 0;
 
         function forceAccurateLocation() {
             showToast("Kumukuha ng GPS Location...");
@@ -481,8 +479,8 @@
             
             routingControl = L.Routing.control({
                 waypoints: wps,
-                // STRICT E-BIKE ROUTING LOCKED
-                router: L.Routing.osrmv1({ serviceUrl: `https://routing.openstreetmap.de/routed-bike/route/v1` }), 
+                // MOTOR-VEHICLE ROAD ROUTING (closest public profile for motorcycle navigation)
+                router: L.Routing.osrmv1({ serviceUrl: `https://routing.openstreetmap.de/routed-car/route/v1` }), 
                 routeWhileDragging: false,
                 addWaypoints: false,
                 
@@ -521,14 +519,18 @@
                 }
             }).on('routesfound', function(e) {
                 hideToast();
+                const wasRecalculating = isRecalculating;
                 isRecalculating = false;
                 
                 const route = e.routes[0];
                 activeRouteDistanceKm = route.summary.totalDistance / 1000;
                 const timeMin = Math.round(route.summary.totalTime / 60);
                 
-                // STORE ROUTE COORDS FOR OFF-ROUTE DETECTION
-                activeRouteCoords = route.coordinates;
+                // STORE ROUTE COORDS FOR OFF-ROUTE DETECTION + TURN-BY-TURN VOICE
+                activeRouteCoords = route.coordinates || [];
+                activeInstructions = Array.isArray(route.instructions) ? route.instructions : [];
+                currentInstructionIndex = 0;
+                announcedInstructionKey = "";
                 
                 activeLegDistances = [];
                 let wpIndices = route.waypointIndices; 
@@ -546,82 +548,68 @@
                 let stopCountText = activeWaypointsList.length > 2 ? `(${activeWaypointsList.length - 1} Destinations) • ` : "";
                 
                 document.getElementById('route-eta').innerText = timeMin + " min";
-                document.getElementById('route-dist').innerText = stopCountText + activeRouteDistanceKm.toFixed(1) + " km • E-Bike Route";
+                document.getElementById('route-dist').innerText = stopCountText + activeRouteDistanceKm.toFixed(1) + " km • Motorcycle Route";
                 
                 activeWaypointsList = routingControl.getWaypoints().map(wp => wp.latLng);
-                runSmartAnalysis(activeRouteDistanceKm, activeLegDistances);
-                
+
+                if (wasRecalculating && isNavigating) {
+                    speak("New route ready.", true);
+                } else {
+                    runSmartAnalysis(activeRouteDistanceKm, activeLegDistances);
+                }
+
+            }).on('routingerror', function() {
+                hideToast();
+                isRecalculating = false;
+                showToast("Hindi makuha ang motorcycle route. Check internet at subukan ulit.");
+                speak("Route calculation failed. Please check your connection and try again.", true);
+                setTimeout(hideToast, 3500);
             }).addTo(map);
         }
 
         function runSmartAnalysis(totalDistKm, legDistances) {
             if(!totalDistKm || !legDistances) return;
+
             const currentRange = (currentLiveBattery / 100) * maxRangeLimit;
             const roundTrip = totalDistKm * 2;
-            const kmPerHourCharge = maxRangeLimit / fullChargeHours;
-            
-            const contentDiv = document.getElementById('analysis-content');
-            let isMultiStop = legDistances.length > 1;
-
-            let breakdownHtml = `<div style="background:#f8f9fa; padding:15px; border-radius:12px; margin-bottom:18px; border: 1px solid #e0e0e0;">`;
-            breakdownHtml += `<div style="font-size:13px; color:#555; font-weight:900; margin-bottom:10px; text-transform:uppercase; letter-spacing:0.5px;">Route Breakdown:</div>`;
-            for(let i=0; i < legDistances.length; i++) {
-                let fromName = (i === 0) ? "Start" : `Dest ${i}`;
-                let toName = (i === legDistances.length - 1) ? "Final" : `Dest ${i+1}`;
-                breakdownHtml += `<div style="font-size:14px; color:#333; margin-bottom:8px; display:flex; align-items:center;"><i class="material-icons" style="font-size:18px; color:#1a73e8; margin-right:8px;">timeline</i> ${fromName} ➔ ${toName}: <b style="margin-left:auto; color:#1a73e8;">${legDistances[i].toFixed(1)} km</b></div>`;
-            }
-            breakdownHtml += `<div style="border-top: 2px dashed #ccc; margin-top:10px; padding-top:10px; font-size:16px; font-weight:900; text-align:right; color:#188038;">Total: ${totalDistKm.toFixed(1)} km</div>`;
-            breakdownHtml += `</div>`;
-            
-            let analysisText = "";
-            let voiceWarning = "";
-            let analysisClass = "analysis-text";
+            const kmPerHourCharge = maxRangeLimit / Math.max(fullChargeHours, 0.1);
+            let voiceMessage = "";
 
             if (totalDistKm > currentRange) {
                 let reachableStop = -1;
                 let accumulatedDist = 0;
-                
-                if (isMultiStop) {
+
+                if (legDistances.length > 1) {
                     for(let i = 0; i < legDistances.length - 1; i++) {
                         accumulatedDist += legDistances[i];
-                        if (currentRange >= accumulatedDist) {
-                            reachableStop = i + 1; 
-                        }
+                        if (currentRange >= accumulatedDist) reachableStop = i + 1;
                     }
                 }
-                
+
                 if (reachableStop !== -1) {
-                    analysisText = `WARNING: Hindi kaya ang buong biyahe. Hanggang Dest ${reachableStop} (${accumulatedDist.toFixed(1)} km) ka lang aabot. Mag-charge muna doon!`;
-                    voiceWarning = `Warning. Not enough battery for the full trip. You can only reach Destination ${reachableStop}. Please charge there.`;
-                    analysisClass = "analysis-text warning";
+                    voiceMessage = `Warning. Your battery is not enough for the full trip. You can reach Destination ${reachableStop}, but you should charge there before continuing.`;
                 } else {
-                    let firstTarget = isMultiStop ? `Dest 1 (${legDistances[0].toFixed(1)} km)` : `destination (${totalDistKm.toFixed(1)} km)`;
-                    analysisText = `CRITICAL WARNING: Sobrang baba ng battery (${currentRange.toFixed(1)} km range)! Hindi ka aabot sa unang ${firstTarget}. Mag-charge ka na ngayon!`;
-                    voiceWarning = "Critical Warning. Destination is out of range. Charge immediately.";
-                    analysisClass = "analysis-text warning";
+                    voiceMessage = "Critical battery warning. Your first destination is outside your estimated remaining range. Please charge before starting the trip.";
                 }
             } else if (roundTrip > currentRange) {
                 const deficit = roundTrip - currentRange;
-                const hoursNeeded = (deficit / kmPerHourCharge).toFixed(1);
-                analysisText = `WARNING: Aabot ka sa lahat ng pupuntahan, pero malolowbat ka pauwi. Charge nang at least ${hoursNeeded} hours sa destinasyon mo para makabalik.`;
-                voiceWarning = `Warning. Not enough battery for a round trip. Prepare to charge for at least ${hoursNeeded} hours.`;
-                analysisClass = "analysis-text warning";
+                const hoursNeeded = Math.max(0.1, deficit / kmPerHourCharge);
+                const roundedHours = Math.ceil(hoursNeeded * 10) / 10;
+                voiceMessage = `Battery check. You can reach your destination, but the estimated range is not enough for the return trip. Charge for at least ${roundedHours} hours before going back.`;
             } else {
-                analysisText = `SAFE: Sapat ang battery mo balikan! Estimated na matitirang range pag-uwi: ${(currentRange - roundTrip).toFixed(1)} km.`;
-                voiceWarning = "Battery sufficient for a round trip. Safe to proceed.";
-                analysisClass = "analysis-text";
+                const remaining = Math.max(0, currentRange - roundTrip);
+                voiceMessage = `Battery check complete. Estimated range is enough for the round trip, with about ${remaining.toFixed(1)} kilometers of range remaining.`;
             }
-            
-            contentDiv.innerHTML = breakdownHtml + `<div class="${analysisClass}">${analysisText}</div>`;
-            document.getElementById('analysis-modal').style.display = 'flex';
-            speak(voiceWarning);
+
+            // VOICE ONLY — no analysis modal or on-screen breakdown
+            speak(voiceMessage, true);
         }
 
         window.runManualAnalysis = function() {
             if(activeRouteDistanceKm > 0 && activeLegDistances.length > 0) {
                 runSmartAnalysis(activeRouteDistanceKm, activeLegDistances);
             } else {
-                showToast("Maghanap muna ng ruta bago mag-analyze.");
+                showToast("Maghanap muna ng ruta bago mag-voice range check.");
                 setTimeout(hideToast, 2000);
             }
         }
@@ -661,7 +649,7 @@
         }
         updateDashboard();
 
-        window.toggleNav = function() {
+        window.toggleNav = function(silentEnd = false) {
             if(!isNavigating) {
                 isNavigating = true;
                 lastTrackedCoords = {lat: currentLat, lng: currentLng}; 
@@ -680,11 +668,11 @@
                 map.setView([currentLat, currentLng], 19, {animate: true});
                 
                 if(activeWaypointsList.length > 1) {
-                    speak("Navigation started. Follow the route.");
-                    document.getElementById('turn-text').innerText = "Follow the route";
+                    speak("Motorcycle navigation started. Follow the route.", true);
+                    document.getElementById('turn-text').innerText = "Motorcycle route";
                     document.getElementById('turn-icon').innerText = "straight";
                 } else {
-                    speak("Free ride started. Tracking trip and battery.");
+                    speak("Free ride started. Tracking trip and battery.", true);
                     document.getElementById('turn-text').innerText = "Free Ride Mode";
                     document.getElementById('turn-icon').innerText = "explore";
                 }
@@ -705,7 +693,7 @@
                 if(arrowEl) { arrowEl.style.transform = `rotate(0deg)`; }
                 
                 map.setZoom(17, {animate: true});
-                speak("Navigation ended.");
+                if (!silentEnd) speak("Navigation ended.", true);
             }
         }
 
@@ -723,12 +711,22 @@
                     map.panTo([currentLat, currentLng], {animate: true, duration: 0.5});
                     
                     if(lastTrackedCoords) {
-                        const moved = map.distance(lastTrackedCoords, [currentLat, currentLng]) / 1000;
-                        tripDistance += moved;
-                        saveState(); 
-                        updateDashboard();
+                        const movedMeters = map.distance(lastTrackedCoords, [currentLat, currentLng]);
+                        const accuracy = Number.isFinite(pos.coords.accuracy) ? pos.coords.accuracy : 999;
+
+                        // Ignore GPS jitter and impossible jumps. This keeps the trip meter stable while stopped.
+                        if (accuracy <= 50 && movedMeters >= 3 && movedMeters <= 250) {
+                            tripDistance += movedMeters / 1000;
+                            saveState(); 
+                            updateDashboard();
+                            lastTrackedCoords = {lat: currentLat, lng: currentLng};
+                        } else if (movedMeters > 250) {
+                            // Re-anchor after a GPS jump without charging the jump to trip distance.
+                            lastTrackedCoords = {lat: currentLat, lng: currentLng};
+                        }
+                    } else {
+                        lastTrackedCoords = {lat: currentLat, lng: currentLng};
                     }
-                    lastTrackedCoords = {lat: currentLat, lng: currentLng};
 
                     let currentIntKm = Math.floor(tripDistance);
                     if (currentIntKm > lastSpokenKm && currentIntKm > 0) {
@@ -751,17 +749,21 @@
                             if (dist < minOffDist) minOffDist = dist;
                         }
 
-                        if (isOffRoute && minOffDist > 50) {
+                        if (isOffRoute && minOffDist > 60 && (Date.now() - lastOffRouteRecalcAt) > 8000) {
                             isRecalculating = true;
-                            speak("You are off route. Recalculating.");
-                            showToast("Lihis sa daan. Recalculating...");
-                            
-                            // Update origin to current location and force routing engine to recalc
+                            lastOffRouteRecalcAt = Date.now();
+                            speak("You are off route. Recalculating.", true);
+                            showToast("Lihis sa ruta. Recalculating...");
+
+                            // Update origin to current location and force the road router to recalculate.
                             activeWaypointsList[0] = currentLL;
                             routingControl.setWaypoints(activeWaypointsList);
-                            activeRouteCoords = []; // Clear array until new route is found
+                            activeRouteCoords = [];
                         }
                     }
+
+                    // TURN-BY-TURN VOICE NAVIGATION
+                    processTurnInstructions();
 
                     // ARRIVAL WARNING LOGIC
                     if (activeWaypointsList.length > currentWaypointTargetIndex) {
@@ -772,17 +774,17 @@
 
                         if (d <= 500 && d > 50 && !spokenArrivalWarning) {
                             if (isFinalStop) {
-                                speak("You are approaching your final destination.");
+                                speak("You are approaching your final destination.", true);
                             } else {
-                                speak(`You are approaching Destination ${currentWaypointTargetIndex}.`);
+                                speak(`You are approaching Destination ${currentWaypointTargetIndex}.`, true);
                             }
                             spokenArrivalWarning = true;
                         } else if (d <= 50) {
                             if (isFinalStop) {
-                                speak("You have arrived at your final destination.");
-                                toggleNav(); 
+                                speak("You have arrived at your final destination.", true);
+                                toggleNav(true); 
                             } else {
-                                speak(`You have arrived at Destination ${currentWaypointTargetIndex}. Continuing to next route.`);
+                                speak(`You have arrived at Destination ${currentWaypointTargetIndex}. Continuing to next route.`, true);
                                 currentWaypointTargetIndex++;
                                 spokenArrivalWarning = false; 
                             }
@@ -809,7 +811,7 @@
                         if(arrowEl) { arrowEl.style.transform = `rotate(${accumulatedRotation}deg)`; }
                     }
                 }
-            }, err => {}, { enableHighAccuracy: true, maximumAge: 0 }); 
+            }, err => {}, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }); 
         }
 
         function showToast(msg) {
@@ -818,10 +820,97 @@
         }
         function hideToast() { document.getElementById('toast').style.display = 'none'; }
         
-        window.speak = function(text) {
-            if (!window.speechSynthesis) return;
-            let msg = new SpeechSynthesisUtterance(text);
-            msg.lang = 'en-US'; 
+        function instructionToVoice(inst) {
+            if (!inst) return "Continue on the route.";
+            const type = String(inst.type || "").toLowerCase();
+            const road = inst.road ? ` onto ${inst.road}` : "";
+
+            if (type.includes("sharp") && type.includes("left")) return `Make a sharp left${road}.`;
+            if (type.includes("sharp") && type.includes("right")) return `Make a sharp right${road}.`;
+            if (type.includes("slight") && type.includes("left")) return `Keep slightly left${road}.`;
+            if (type.includes("slight") && type.includes("right")) return `Keep slightly right${road}.`;
+            if (type.includes("left")) return `Turn left${road}.`;
+            if (type.includes("right")) return `Turn right${road}.`;
+            if (type.includes("roundabout")) return `Enter the roundabout${inst.exit ? ` and take exit ${inst.exit}` : ""}.`;
+            if (type.includes("uturn") || type.includes("turnaround")) return "Make a U-turn when safe.";
+            if (type.includes("destination")) return "Your destination is ahead.";
+            if (type.includes("waypoint")) return "Your next stop is ahead.";
+            return road ? `Continue${road}.` : "Continue straight.";
+        }
+
+        function instructionIcon(inst) {
+            const type = String(inst?.type || "").toLowerCase();
+            if (type.includes("left")) return "turn_left";
+            if (type.includes("right")) return "turn_right";
+            if (type.includes("roundabout")) return "roundabout_right";
+            if (type.includes("uturn") || type.includes("turnaround")) return "u_turn_left";
+            if (type.includes("destination") || type.includes("waypoint")) return "place";
+            return "straight";
+        }
+
+        function processTurnInstructions() {
+            if (!isNavigating || !activeInstructions.length || !activeRouteCoords.length) return;
+
+            // Skip instructions that are already behind the rider.
+            while (currentInstructionIndex < activeInstructions.length) {
+                const inst = activeInstructions[currentInstructionIndex];
+                const coordIndex = Number(inst.index);
+                if (!Number.isFinite(coordIndex) || !activeRouteCoords[coordIndex]) {
+                    currentInstructionIndex++;
+                    continue;
+                }
+
+                const target = activeRouteCoords[coordIndex];
+                const distanceMeters = map.distance([currentLat, currentLng], target);
+                const keyBase = `${currentInstructionIndex}`;
+
+                const bannerText = instructionToVoice(inst).replace(/\.$/, "");
+                document.getElementById('turn-text').innerText =
+                    distanceMeters > 1000
+                        ? `${(distanceMeters / 1000).toFixed(1)} km • ${bannerText}`
+                        : `${Math.max(0, Math.round(distanceMeters / 10) * 10)} m • ${bannerText}`;
+                document.getElementById('turn-icon').innerText = instructionIcon(inst);
+
+                if (distanceMeters <= 250 && distanceMeters > 70 && announcedInstructionKey !== `${keyBase}-250`) {
+                    announcedInstructionKey = `${keyBase}-250`;
+                    speak(`In ${Math.round(distanceMeters / 10) * 10} meters, ${instructionToVoice(inst)}`);
+                    return;
+                }
+
+                if (distanceMeters <= 70 && announcedInstructionKey !== `${keyBase}-now`) {
+                    announcedInstructionKey = `${keyBase}-now`;
+                    speak(instructionToVoice(inst), true);
+                    return;
+                }
+
+                // Once very close to the maneuver, move to the next one.
+                if (distanceMeters <= 25) {
+                    currentInstructionIndex++;
+                    announcedInstructionKey = "";
+                    continue;
+                }
+
+                break;
+            }
+        }
+
+        window.speak = function(text, priority = false) {
+            if (!text || !window.speechSynthesis) return;
+
+            const now = Date.now();
+            // Prevent accidental repeated GPS callbacks from speaking the exact same line repeatedly.
+            if (!priority && text === lastSpeechText && (now - lastSpeechAt) < 5000) return;
+
+            if (priority) window.speechSynthesis.cancel();
+
+            const msg = new SpeechSynthesisUtterance(text);
+            msg.lang = 'en-US';
+            msg.rate = 1.0;
+            msg.pitch = 1.0;
+            msg.volume = 1.0;
+
+            lastSpeechText = text;
+            lastSpeechAt = now;
             window.speechSynthesis.speak(msg);
         };
     </script>
