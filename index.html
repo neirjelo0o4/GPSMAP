@@ -134,6 +134,13 @@
         }
 
 
+        .route-policy {
+            display:inline-flex; align-items:center; gap:6px; margin-top:6px; width:max-content;
+            padding:5px 9px; border-radius:999px; font-size:9px; font-weight:800; letter-spacing:.7px;
+            color:#dfffea; background:rgba(25,135,84,.18); border:1px solid rgba(99,211,145,.34);
+        }
+        .route-policy::before { content:""; width:6px; height:6px; border-radius:50%; background:#63d391; box-shadow:0 0 10px rgba(99,211,145,.75); }
+
         /* === V3 TESLA / PERFORMANCE UI === */
         :root {
             --glass: rgba(12, 14, 18, 0.78);
@@ -454,6 +461,7 @@
         <div>
             <div class="route-title" id="route-eta">Free Ride Mode</div>
             <div class="route-desc" id="route-dist">GPS Tracking & Trip Meter</div>
+            <div class="route-policy" id="route-policy">NO TOLL • CAR ROUTES ONLY</div>
         </div>
         <button class="btn-start" id="btn-start" onclick="toggleNav()">
             <i class="material-icons">navigation</i> START RIDE
@@ -758,6 +766,8 @@
             if (!isNavigating) {
                 document.getElementById('route-eta').innerText = 'Free Ride Mode';
                 document.getElementById('route-dist').innerText = 'GPS Tracking & Trip Meter';
+                const policyEl = document.getElementById('route-policy');
+                if (policyEl) policyEl.innerText = 'NO TOLL • CAR ROUTES ONLY';
                 document.body.classList.remove('route-nav-active');
                 document.body.classList.remove('free-nav-active');
             }
@@ -941,6 +951,109 @@
             savePlannerState();
         }
 
+        function createStrictNoTollRouter() {
+            // Official OSRM demo endpoint using the driving profile.
+            // The URL is forced to exclude toll-class roads and request up to 3 alternatives.
+            const router = L.Routing.osrmv1({
+                serviceUrl: 'https://router.project-osrm.org/route/v1',
+                profile: 'driving',
+                timeout: 30000
+            });
+
+            const originalBuildRouteUrl = router.buildRouteUrl.bind(router);
+            router.buildRouteUrl = function(waypoints, routeOptions) {
+                let url = originalBuildRouteUrl(waypoints, routeOptions || {});
+
+                // Force strict NO-TOLL. Never silently fall back to toll roads.
+                if (/[?&]exclude=/.test(url)) {
+                    url = url.replace(/([?&])exclude=[^&]*/i, '$1exclude=toll');
+                } else {
+                    url += (url.includes('?') ? '&' : '?') + 'exclude=toll';
+                }
+
+                // Ask OSRM for up to three usable driving alternatives.
+                if (/[?&]alternatives=/.test(url)) {
+                    url = url.replace(/([?&])alternatives=(?:true|false|\d+)/i, '$1alternatives=3');
+                } else {
+                    url += '&alternatives=3';
+                }
+
+                return url;
+            };
+
+            return router;
+        }
+
+        function applySelectedNoTollRoute(route, routeCount = null, selectedByUser = false) {
+            if (!route || !route.summary) return false;
+
+            const newDistanceKm = Number(route.summary.totalDistance || 0) / 1000;
+            const newTimeSeconds = Number(route.summary.totalTime || 0);
+
+            // Ignore duplicate initial routeselected events from Leaflet Routing Machine.
+            if (selectedByUser && Math.abs(newDistanceKm - activeRouteDistanceKm) < 0.001 &&
+                Math.abs(newTimeSeconds - routeTotalTimeSeconds) < 1) {
+                return false;
+            }
+
+            activeRouteDistanceKm = newDistanceKm;
+            const timeMin = Math.max(1, Math.round(newTimeSeconds / 60));
+            activeRouteCoords = route.coordinates || [];
+            activeInstructions = Array.isArray(route.instructions) ? route.instructions : [];
+            currentInstructionIndex = 0;
+            announcedInstructionKey = '';
+            routeTotalTimeSeconds = newTimeSeconds;
+            routeRemainingMeters = Number(route.summary.totalDistance) || 0;
+            routeRemainingTimeSeconds = routeTotalTimeSeconds;
+            routeRemainingMetersByIndex = new Array(activeRouteCoords.length).fill(0);
+
+            let remainingAccumulator = 0;
+            for (let ri = activeRouteCoords.length - 2; ri >= 0; ri--) {
+                remainingAccumulator += map.distance(activeRouteCoords[ri], activeRouteCoords[ri + 1]);
+                routeRemainingMetersByIndex[ri] = remainingAccumulator;
+            }
+            lastNearestRouteIndex = 0;
+
+            activeLegDistances = [];
+            const wpIndices = Array.isArray(route.waypointIndices) ? route.waypointIndices : [];
+            if (wpIndices.length > 1) {
+                for (let i = 1; i < wpIndices.length; i++) {
+                    let dist = 0;
+                    for (let j = wpIndices[i - 1]; j < wpIndices[i]; j++) {
+                        if (activeRouteCoords[j] && activeRouteCoords[j + 1]) {
+                            dist += map.distance(activeRouteCoords[j], activeRouteCoords[j + 1]);
+                        }
+                    }
+                    activeLegDistances.push(dist / 1000);
+                }
+            } else if (activeRouteDistanceKm > 0) {
+                activeLegDistances = [activeRouteDistanceKm];
+            }
+
+            const stopCountText = activeWaypointsList.length > 2 ? `(${activeWaypointsList.length - 1} Destinations) • ` : '';
+            document.getElementById('route-eta').innerText = timeMin + ' min';
+            document.getElementById('route-dist').innerText = stopCountText + activeRouteDistanceKm.toFixed(1) + ' km • NO-TOLL Motorcycle Route';
+
+            const policyEl = document.getElementById('route-policy');
+            if (policyEl) {
+                if (routeCount && routeCount > 1) policyEl.innerText = `NO TOLL • ${routeCount} CAR ROUTES FOUND`;
+                else policyEl.innerText = 'NO TOLL • CAR ROUTE';
+            }
+
+            if (routingControl) {
+                activeWaypointsList = routingControl.getWaypoints().map(wp => wp.latLng);
+            }
+            savePlannerState();
+
+            if (selectedByUser) {
+                showToast('NO-TOLL alternate route selected');
+                speak('Alternative no toll route selected.', true);
+                setTimeout(hideToast, 1600);
+            }
+
+            return true;
+        }
+
         function calculateMultiStopRoute(options = {}) {
             if(!currentLat) { forceAccurateLocation(); return; }
             
@@ -966,8 +1079,9 @@
             
             routingControl = L.Routing.control({
                 waypoints: wps,
-                // MOTOR-VEHICLE ROAD ROUTING (closest public profile for motorcycle navigation)
-                router: L.Routing.osrmv1({ serviceUrl: `https://routing.openstreetmap.de/routed-car/route/v1` }), 
+                // STRICT NO-TOLL MOTOR-VEHICLE ROUTING.
+                // Every returned route must respect exclude=toll; no toll fallback is allowed.
+                router: createStrictNoTollRouter(), 
                 routeWhileDragging: false,
                 addWaypoints: false,
                 
@@ -1014,64 +1128,47 @@
                 hideToast();
                 const wasRecalculating = isRecalculating;
                 isRecalculating = false;
-                
-                const route = e.routes[0];
-                activeRouteDistanceKm = route.summary.totalDistance / 1000;
-                const timeMin = Math.round(route.summary.totalTime / 60);
-                
-                // STORE ROUTE COORDS FOR OFF-ROUTE DETECTION + TURN-BY-TURN VOICE
-                activeRouteCoords = route.coordinates || [];
-                activeInstructions = Array.isArray(route.instructions) ? route.instructions : [];
-                currentInstructionIndex = 0;
-                announcedInstructionKey = "";
-                routeTotalTimeSeconds = Number(route.summary.totalTime) || 0;
-                routeRemainingMeters = Number(route.summary.totalDistance) || 0;
-                routeRemainingTimeSeconds = routeTotalTimeSeconds;
-                routeRemainingMetersByIndex = new Array(activeRouteCoords.length).fill(0);
-                let remainingAccumulator = 0;
-                for (let ri = activeRouteCoords.length - 2; ri >= 0; ri--) {
-                    remainingAccumulator += map.distance(activeRouteCoords[ri], activeRouteCoords[ri + 1]);
-                    routeRemainingMetersByIndex[ri] = remainingAccumulator;
+
+                const routes = Array.isArray(e.routes) ? e.routes : [];
+                if (!routes.length) {
+                    const policyEl = document.getElementById('route-policy');
+                    if (policyEl) policyEl.innerText = 'NO TOLL • NO ROUTE FOUND';
+                    showToast('Walang toll-free car route na nahanap.');
+                    speak('No toll free driving route was found.', true);
+                    setTimeout(hideToast, 3200);
+                    return;
                 }
-                lastNearestRouteIndex = 0;
-                
-                activeLegDistances = [];
-                let wpIndices = route.waypointIndices; 
-                
-                for(let i = 1; i < wpIndices.length; i++) {
-                    let dist = 0;
-                    for(let j = wpIndices[i-1]; j < wpIndices[i]; j++) {
-                        if (activeRouteCoords[j] && activeRouteCoords[j+1]) {
-                            dist += map.distance(activeRouteCoords[j], activeRouteCoords[j+1]);
-                        }
-                    }
-                    activeLegDistances.push(dist / 1000); 
+
+                applySelectedNoTollRoute(routes[0], routes.length, false);
+
+                if (routes.length > 1 && !options.resumeNavigation && !wasRecalculating) {
+                    showToast(`${routes.length} NO-TOLL car routes found`);
+                    setTimeout(hideToast, 1800);
                 }
-                
-                let stopCountText = activeWaypointsList.length > 2 ? `(${activeWaypointsList.length - 1} Destinations) • ` : "";
-                
-                document.getElementById('route-eta').innerText = timeMin + " min";
-                document.getElementById('route-dist').innerText = stopCountText + activeRouteDistanceKm.toFixed(1) + " km • Motorcycle Route";
-                
-                activeWaypointsList = routingControl.getWaypoints().map(wp => wp.latLng);
-                savePlannerState();
 
                 if (options.resumeNavigation && !isNavigating) {
                     currentWaypointTargetIndex = Math.max(1, parseInt(localStorage.getItem('nav_waypointTargetIndex') || '1', 10));
                     lastSpokenKm = Math.max(0, parseInt(localStorage.getItem('nav_lastSpokenKm') || '0', 10));
                     setTimeout(() => toggleNav(false, true), 250);
                 } else if (wasRecalculating && isNavigating) {
-                    speak("New route ready.", true);
+                    speak('New no toll route ready.', true);
                 } else if (!options.suppressAnalysis) {
                     runSmartAnalysis(activeRouteDistanceKm, activeLegDistances);
                 }
 
+            }).on('routeselected', function(e) {
+                // Alternate blue/gray route selection remains strict NO-TOLL because all
+                // alternatives come from the same exclude=toll OSRM request.
+                if (e && e.route) applySelectedNoTollRoute(e.route, null, true);
+
             }).on('routingerror', function() {
                 hideToast();
                 isRecalculating = false;
-                showToast("Hindi makuha ang motorcycle route. Check internet at subukan ulit.");
-                speak("Route calculation failed. Please check your connection and try again.", true);
-                setTimeout(hideToast, 3500);
+                const policyEl = document.getElementById('route-policy');
+                if (policyEl) policyEl.innerText = 'NO TOLL • NO ROUTE FOUND';
+                showToast("Walang valid NO-TOLL car route, o unavailable ang routing server.");
+                speak("No valid no toll driving route was found. Toll roads will not be used.", true);
+                setTimeout(hideToast, 4200);
             }).addTo(map);
         }
 
