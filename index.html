@@ -693,7 +693,7 @@
                 currentLat = pos.coords.latitude;
                 currentLng = pos.coords.longitude;
                 updateMarker();
-                map.setView([currentLat, currentLng], isNavigating ? 17.25 : 16, {animate: false});
+                map.setView([currentLat, currentLng], isNavigating ? 16.5 : 15.5, {animate: false});
                 hideToast();
                 maybeRestoreRouteAndRide();
             }, err => {
@@ -1117,7 +1117,7 @@
                 
                 map.dragging.disable();
                 map.touchZoom.disable();
-                map.setView([currentLat, currentLng], 17.25, {animate: false});
+                map.setView([currentLat, currentLng], 16.5, {animate: false});
                 
                 if(activeWaypointsList.length > 1) {
                     if (!silentStart) speak("Motorcycle navigation started. Follow the route.", true);
@@ -1516,12 +1516,12 @@
         }
 
         function desiredTeslaZoom() {
-            if (nextManeuverDistanceMeters <= 90) return 18.0;
-            if (nextManeuverDistanceMeters <= 220) return 17.75;
-            if (currentSpeedKmh >= 70) return 16.5;
-            if (currentSpeedKmh >= 50) return 16.75;
-            if (currentSpeedKmh >= 30) return 17.0;
-            return 17.25;
+            if (nextManeuverDistanceMeters <= 90) return 17.0;
+            if (nextManeuverDistanceMeters <= 220) return 16.75;
+            if (currentSpeedKmh >= 70) return 15.5;
+            if (currentSpeedKmh >= 50) return 15.75;
+            if (currentSpeedKmh >= 30) return 16.0;
+            return 16.25;
         }
 
         function updateTeslaNavigationCamera() {
@@ -1529,9 +1529,9 @@
             if (now < overviewModeUntil || now - lastTeslaCameraAt < 650 || currentLat === null || currentLng === null) return;
             lastTeslaCameraAt = now;
 
-            let lookAheadMeters = Math.min(190, Math.max(45, 45 + currentSpeedKmh * 1.7));
-            if (Number.isFinite(nextManeuverDistanceMeters) && nextManeuverDistanceMeters < 250) {
-                lookAheadMeters = Math.max(25, Math.min(95, nextManeuverDistanceMeters * 0.40));
+            let lookAheadMeters = Math.min(320, Math.max(90, 100 + currentSpeedKmh * 2.1));
+            if (Number.isFinite(nextManeuverDistanceMeters) && nextManeuverDistanceMeters < 320) {
+                lookAheadMeters = Math.max(70, Math.min(145, nextManeuverDistanceMeters * 0.55));
             }
             const routeHeading = routeBearingAt(lastNearestRouteIndex);
             const cameraHeading = Number.isFinite(currentHeadingDeg) ? currentHeadingDeg : routeHeading;
@@ -1545,8 +1545,8 @@
             overviewModeUntil = Date.now() + 8000;
             try {
                 const bounds = L.latLngBounds(activeRouteCoords);
-                map.fitBounds(bounds, { paddingTopLeft:[28,130], paddingBottomRight:[28,95], animate:false, maxZoom:16.25 });
-                showToast('Route overview • Auto-follow resumes shortly');
+                map.fitBounds(bounds, { paddingTopLeft:[24,120], paddingBottomRight:[24,90], animate:false, maxZoom:15.75 });
+                showToast('Wider route overview • Auto-follow resumes shortly');
                 setTimeout(hideToast, 1800);
             } catch (e) {}
         }
