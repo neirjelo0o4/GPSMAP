@@ -383,6 +383,33 @@
             body.route-nav-active .btn-gps { right:140px; left:auto; bottom:12px; }
         }
 
+
+
+        /* GOOGLE-MAPS-LIKE ROUTE CHOOSER */
+        .route-choice-panel {
+            display:none; gap:8px; overflow-x:auto; padding:2px 1px 4px;
+            scrollbar-width:none; -webkit-overflow-scrolling:touch;
+        }
+        .route-choice-panel::-webkit-scrollbar { display:none; }
+        .route-choice-card {
+            flex:0 0 min(250px, 78vw); text-align:left; border:1px solid rgba(255,255,255,.16);
+            border-radius:15px; padding:10px 11px; cursor:pointer;
+            background:rgba(12,16,21,.72); color:#fff; box-shadow:0 7px 18px rgba(0,0,0,.12);
+            transition:transform .14s ease, border-color .14s ease, background .14s ease;
+        }
+        .route-choice-card:active { transform:scale(.985); }
+        .route-choice-card.selected { border-color:#4da3ff; background:rgba(19,45,73,.86); box-shadow:0 0 0 1px rgba(77,163,255,.22); }
+        .route-choice-top { display:flex; justify-content:space-between; align-items:flex-start; gap:9px; }
+        .route-choice-title { font-size:12px; font-weight:850; letter-spacing:.25px; color:#fff; }
+        .route-choice-eta { font-size:18px; font-weight:800; line-height:1; color:#72baff; white-space:nowrap; }
+        .route-choice-meta { margin-top:5px; font-size:11px; color:rgba(255,255,255,.68); font-weight:650; }
+        .route-choice-roads { margin-top:5px; font-size:10px; color:rgba(255,255,255,.48); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .route-choice-badge { display:inline-flex; align-items:center; gap:4px; margin-top:7px; padding:4px 7px; border-radius:999px; font-size:9px; font-weight:850; letter-spacing:.45px; background:rgba(100,215,145,.12); color:#7be2a6; border:1px solid rgba(123,226,166,.18); }
+        .route-choice-badge.local { background:rgba(79,162,255,.12); color:#7fbdff; border-color:rgba(127,189,255,.20); }
+        .route-choice-note { display:none; margin-top:1px; font-size:9px; line-height:1.3; color:rgba(30,35,42,.58); font-weight:650; }
+        @media (prefers-color-scheme: dark) { .route-choice-note { color:rgba(255,255,255,.45); } }
+        body.route-nav-active .route-choice-panel, body.free-nav-active .route-choice-panel { display:none !important; }
+
     </style>
 </head>
 <body>
@@ -463,6 +490,8 @@
             <div class="route-desc" id="route-dist">GPS Tracking & Trip Meter</div>
             <div class="route-policy" id="route-policy">NO TOLL • CAR ROUTES ONLY</div>
         </div>
+        <div class="route-choice-panel" id="route-choice-panel"></div>
+        <div class="route-choice-note" id="route-choice-note">Choose a route before starting. Local-road option avoids motorway/expressway when available.</div>
         <button class="btn-start" id="btn-start" onclick="toggleNav()">
             <i class="material-icons">navigation</i> START RIDE
         </button>
@@ -699,6 +728,10 @@
         let routeRemainingMetersByIndex = [];
         let overviewModeUntil = 0;
         let lastNearestRouteIndex = 0;
+        let availableRouteChoices = [];
+        let selectedRouteChoiceIndex = 0;
+        let routeChoiceRenderToken = 0;
+        let suppressRouteChoiceAnnouncement = false;
 
         function forceAccurateLocation() {
             showToast("Kumukuha ng GPS Location...");
@@ -737,6 +770,10 @@
             activeLegDistances = [];
             activeRouteCoords = [];
             activeInstructions = [];
+            availableRouteChoices = [];
+            selectedRouteChoiceIndex = 0;
+            routeChoiceRenderToken++;
+            renderRouteChoices();
             activeRouteDistanceKm = 0;
             currentInstructionIndex = 0;
             announcedInstructionKey = "";
@@ -1054,6 +1091,217 @@
             return true;
         }
 
+
+        function routeKey(route) {
+            const d = Math.round(Number(route?.summary?.totalDistance || 0));
+            const t = Math.round(Number(route?.summary?.totalTime || 0));
+            return `${d}:${t}`;
+        }
+
+        function majorRoadNames(route) {
+            const seen = new Set();
+            const roads = [];
+            (route?.instructions || []).forEach(inst => {
+                const road = String(inst?.road || '').trim();
+                if (!road || seen.has(road.toLowerCase())) return;
+                seen.add(road.toLowerCase());
+                roads.push(road);
+            });
+            return roads.slice(0, 3);
+        }
+
+        function mapOsrmStepType(step) {
+            const type = String(step?.maneuver?.type || '').toLowerCase();
+            const mod = String(step?.maneuver?.modifier || '').toLowerCase();
+            if (type === 'arrive') return 'DestinationReached';
+            if (type === 'depart') return 'StartAt';
+            if (type.includes('roundabout') || type === 'rotary') return 'Roundabout';
+            if (type === 'uturn' || mod === 'uturn') return 'TurnAround';
+            if (mod === 'sharp left') return 'SharpLeft';
+            if (mod === 'sharp right') return 'SharpRight';
+            if (mod === 'slight left') return 'SlightLeft';
+            if (mod === 'slight right') return 'SlightRight';
+            if (mod === 'left') return 'Left';
+            if (mod === 'right') return 'Right';
+            return 'Straight';
+        }
+
+        function nearestCoordIndex(coords, location, startAt = 0) {
+            if (!coords.length || !Array.isArray(location)) return Math.max(0, startAt);
+            const target = L.latLng(location[1], location[0]);
+            let best = Math.max(0, Math.min(startAt, coords.length - 1));
+            let bestDist = Infinity;
+            const end = Math.min(coords.length - 1, best + 350);
+            for (let i = best; i <= end; i++) {
+                const d = map.distance(coords[i], target);
+                if (d < bestDist) { bestDist = d; best = i; }
+            }
+            return best;
+        }
+
+        function rawOsrmRouteToLeaflet(rawRoute, wps, label = '') {
+            const geo = rawRoute?.geometry?.coordinates || [];
+            const coords = geo.map(c => L.latLng(c[1], c[0]));
+            const instructions = [];
+            let searchIndex = 0;
+            (rawRoute?.legs || []).forEach(leg => {
+                (leg?.steps || []).forEach(step => {
+                    const idx = nearestCoordIndex(coords, step?.maneuver?.location, searchIndex);
+                    searchIndex = idx;
+                    instructions.push({
+                        distance: Number(step?.distance || 0),
+                        time: Number(step?.duration || 0),
+                        type: mapOsrmStepType(step),
+                        road: step?.name || step?.ref || '',
+                        direction: '',
+                        exit: step?.maneuver?.exit,
+                        index: idx
+                    });
+                });
+            });
+            return {
+                name: label || 'Alternate route',
+                summary: { totalDistance: Number(rawRoute?.distance || 0), totalTime: Number(rawRoute?.duration || 0) },
+                coordinates: coords,
+                waypoints: wps,
+                inputWaypoints: wps.map(ll => ({latLng: ll})),
+                instructions,
+                waypointIndices: [0, Math.max(0, coords.length - 1)],
+                _localRoadCandidate: true
+            };
+        }
+
+        function rawRouteHasClass(rawRoute, className) {
+            const wanted = String(className).toLowerCase();
+            for (const leg of (rawRoute?.legs || [])) {
+                for (const step of (leg?.steps || [])) {
+                    for (const inter of (step?.intersections || [])) {
+                        const classes = Array.isArray(inter?.classes) ? inter.classes : [];
+                        if (classes.some(c => String(c).toLowerCase() === wanted)) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        async function fetchLocalRoadNoTollChoices(wps) {
+            // Secondary probe: force no motorway, then reject any route still tagged toll.
+            // This gives a lower-speed/local-road option while preserving strict NO-TOLL policy.
+            if (!Array.isArray(wps) || wps.length !== 2) return [];
+            const coords = wps.map(ll => `${ll.lng},${ll.lat}`).join(';');
+            const url = `https://router.project-osrm.org/route/v1/driving/${coords}?alternatives=3&steps=true&overview=full&geometries=geojson&exclude=motorway`;
+            try {
+                const res = await fetch(url);
+                if (!res.ok) return [];
+                const data = await res.json();
+                if (data?.code !== 'Ok' || !Array.isArray(data?.routes)) return [];
+                return data.routes
+                    .filter(r => !rawRouteHasClass(r, 'toll'))
+                    .map((r, i) => rawOsrmRouteToLeaflet(r, wps, i === 0 ? 'Local roads' : `Local alternate ${i + 1}`));
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function chooseRouteFromCard(index) {
+            const route = availableRouteChoices[index];
+            if (!route) return;
+            selectedRouteChoiceIndex = index;
+            const alternatives = availableRouteChoices.filter((_, i) => i !== index);
+            try {
+                if (routingControl && typeof routingControl.selectRoute === 'function') {
+                    routingControl.selectRoute({ route, alternatives });
+                } else if (routingControl && typeof routingControl._routeSelected === 'function') {
+                    routingControl._routeSelected({ route, alternatives });
+                } else {
+                    applySelectedNoTollRoute(route, availableRouteChoices.length, true);
+                }
+            } catch (e) {
+                applySelectedNoTollRoute(route, availableRouteChoices.length, true);
+            }
+            renderRouteChoices();
+        }
+        window.chooseRouteFromCard = chooseRouteFromCard;
+
+        function renderRouteChoices() {
+            const panel = document.getElementById('route-choice-panel');
+            const note = document.getElementById('route-choice-note');
+            if (!panel) return;
+            if (!availableRouteChoices.length) {
+                panel.style.display = 'none';
+                if (note) note.style.display = 'none';
+                panel.innerHTML = '';
+                return;
+            }
+
+            const minTime = Math.min(...availableRouteChoices.map(r => Number(r?.summary?.totalTime || Infinity)));
+            const minDist = Math.min(...availableRouteChoices.map(r => Number(r?.summary?.totalDistance || Infinity)));
+            panel.innerHTML = availableRouteChoices.map((r, i) => {
+                const sec = Number(r?.summary?.totalTime || 0);
+                const km = Number(r?.summary?.totalDistance || 0) / 1000;
+                const mins = Math.max(1, Math.round(sec / 60));
+                const roads = majorRoadNames(r);
+                const isLocal = !!r._localRoadCandidate;
+                let title = i === 0 ? 'Recommended' : `Route ${i + 1}`;
+                if (isLocal) title = 'Local Roads';
+                else if (Math.abs(sec - minTime) < 1) title = 'Fastest No Toll';
+                else if (Math.abs(Number(r?.summary?.totalDistance || 0) - minDist) < 1) title = 'Shortest No Toll';
+                const badge = isLocal ? 'NO TOLL • NO MOTORWAY' : 'STRICT NO TOLL';
+                return `<button class="route-choice-card ${i === selectedRouteChoiceIndex ? 'selected' : ''}" onclick="chooseRouteFromCard(${i})">
+                    <div class="route-choice-top"><div class="route-choice-title">${title}</div><div class="route-choice-eta">${mins} min</div></div>
+                    <div class="route-choice-meta">${km.toFixed(km >= 10 ? 0 : 1)} km</div>
+                    <div class="route-choice-roads">${roads.length ? roads.join(' • ') : 'Driving road route'}</div>
+                    <div class="route-choice-badge ${isLocal ? 'local' : ''}">${badge}</div>
+                </button>`;
+            }).join('');
+            panel.style.display = availableRouteChoices.length > 1 ? 'flex' : 'none';
+            if (note) note.style.display = availableRouteChoices.length > 1 ? 'block' : 'none';
+        }
+
+        async function buildRouteChoiceSet(primaryRoutes, wps, token) {
+            const merged = [];
+            const keys = new Set();
+            const pushUnique = route => {
+                if (!route?.summary || !route?.coordinates?.length) return;
+                const k = routeKey(route);
+                if (keys.has(k)) return;
+                keys.add(k);
+                merged.push(route);
+            };
+
+            (primaryRoutes || []).forEach(pushUnique);
+            const localRoutes = await fetchLocalRoadNoTollChoices(wps);
+            if (token !== routeChoiceRenderToken) return;
+            localRoutes.forEach(pushUnique);
+
+            // Prefer a local-road/no-motorway option first when available, then fastest toll-free routes.
+            merged.sort((a, b) => {
+                const al = a._localRoadCandidate ? 0 : 1;
+                const bl = b._localRoadCandidate ? 0 : 1;
+                if (al !== bl) return al - bl;
+                return Number(a?.summary?.totalTime || Infinity) - Number(b?.summary?.totalTime || Infinity);
+            });
+
+            availableRouteChoices = merged.slice(0, 4);
+            selectedRouteChoiceIndex = 0;
+            renderRouteChoices();
+
+            if (routingControl && availableRouteChoices.length > 1) {
+                try { routingControl.setAlternatives(availableRouteChoices); } catch (e) {}
+                try {
+                    const first = availableRouteChoices[0];
+                    const alternatives = availableRouteChoices.slice(1);
+                    suppressRouteChoiceAnnouncement = true;
+                    if (typeof routingControl.selectRoute === 'function') routingControl.selectRoute({route:first, alternatives});
+                    else if (typeof routingControl._routeSelected === 'function') routingControl._routeSelected({route:first, alternatives});
+                    suppressRouteChoiceAnnouncement = false;
+                } catch (e) {
+                    suppressRouteChoiceAnnouncement = false;
+                    applySelectedNoTollRoute(availableRouteChoices[0], availableRouteChoices.length, false);
+                }
+            }
+        }
+
         function calculateMultiStopRoute(options = {}) {
             if(!currentLat) { forceAccurateLocation(); return; }
             
@@ -1141,9 +1389,20 @@
 
                 applySelectedNoTollRoute(routes[0], routes.length, false);
 
+                // Build explicit Google-Maps-like route choices and probe for a local-road/no-motorway option.
+                const choiceToken = ++routeChoiceRenderToken;
+                const choiceWps = routingControl ? routingControl.getWaypoints().map(wp => wp.latLng) : activeWaypointsList.slice();
+                if (!options.resumeNavigation && !wasRecalculating) {
+                    buildRouteChoiceSet(routes, choiceWps, choiceToken);
+                } else {
+                    availableRouteChoices = routes.slice(0, 4);
+                    selectedRouteChoiceIndex = 0;
+                    renderRouteChoices();
+                }
+
                 if (routes.length > 1 && !options.resumeNavigation && !wasRecalculating) {
-                    showToast(`${routes.length} NO-TOLL car routes found`);
-                    setTimeout(hideToast, 1800);
+                    showToast(`${routes.length} strict NO-TOLL routes found • checking local-road option…`);
+                    setTimeout(hideToast, 2200);
                 }
 
                 if (options.resumeNavigation && !isNavigating) {
@@ -1157,9 +1416,14 @@
                 }
 
             }).on('routeselected', function(e) {
-                // Alternate blue/gray route selection remains strict NO-TOLL because all
-                // alternatives come from the same exclude=toll OSRM request.
-                if (e && e.route) applySelectedNoTollRoute(e.route, null, true);
+                // Route can be selected by tapping a map line or one of the explicit route cards.
+                if (e && e.route) {
+                    applySelectedNoTollRoute(e.route, availableRouteChoices.length || null, !suppressRouteChoiceAnnouncement);
+                    const selectedKey = routeKey(e.route);
+                    const idx = availableRouteChoices.findIndex(r => routeKey(r) === selectedKey);
+                    if (idx >= 0) selectedRouteChoiceIndex = idx;
+                    renderRouteChoices();
+                }
 
             }).on('routingerror', function() {
                 hideToast();
