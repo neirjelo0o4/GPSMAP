@@ -5,9 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#101721">
   <meta name="description" content="Tesla-inspired local-road navigation with OpenStreetMap bicycle navigation with road-first routing.">
-  <title>e-Moto NAV • Free Bike Lane / Wide Roads</title>
+  <title>e-Moto NAV V8 • Direction-Up Tesla Ride</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Native Leaflet layer rotation: no oversized 200vw map or whole-page CSS rotation. -->
+  <script src="https://cdn.jsdelivr.net/npm/@tomickigrzegorz/leaflet-rotate@0.2.4/dist/leaflet-rotate.umd.min.js" onerror="this.onerror=null;this.src='https://unpkg.com/@tomickigrzegorz/leaflet-rotate@0.2.4/dist/leaflet-rotate.umd.min.js'"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Material+Symbols+Rounded:FILL@0..1&display=swap" rel="stylesheet">
@@ -21,7 +23,9 @@
     .ui>*{pointer-events:auto}.glass{background:var(--glass);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:21px;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
     .appmark{position:absolute;left:15px;top:calc(13px + env(safe-area-inset-top));padding:8px 12px 8px 10px;display:flex;align-items:center;gap:9px;font-size:12px;font-weight:800;letter-spacing:.4px}
     .appmark i{color:#65b6ff;font-size:23px}.appmark em{font-size:9px;font-style:normal;color:var(--muted);display:block;letter-spacing:1.6px;margin-top:2px}
-    .top-actions{position:absolute;right:14px;top:calc(13px + env(safe-area-inset-top));display:flex;gap:7px}
+    .top-actions{position:absolute;right:14px;top:calc(13px + env(safe-area-inset-top));display:flex;gap:7px;z-index:11}
+    body.riding .top-actions{top:calc(122px + env(safe-area-inset-top))}
+    #orientation-btn.heading-on{background:rgba(29,100,162,.88);border-color:rgba(130,203,255,.65)}
     .round{width:44px;height:44px;border-radius:14px;color:#fff;background:var(--glass);box-shadow:0 8px 24px #0002;border:1px solid var(--line);display:grid;place-items:center}
     .planning{position:absolute;top:calc(79px + env(safe-area-inset-top));left:14px;width:min(370px,calc(100vw - 28px));padding:15px}
     .field-label{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;font-weight:800;color:#8fa9c1;margin-bottom:7px}
@@ -69,7 +73,7 @@
   <div id="free-map" aria-label="OpenStreetMap bicycle navigation with route choices"></div>
   <div class="ui">
     <div class="appmark glass"><i class="mi">electric_moped</i><div>e-MOTO NAV<em>FREE OSM • TESLA UI</em></div></div>
-    <div class="top-actions"><button class="round" id="settings-btn" title="Settings"><i class="mi">tune</i></button><button class="round" id="audio-btn" title="Mute or unmute"><i class="mi" id="audio-icon">volume_up</i></button></div>
+    <div class="top-actions"><button class="round heading-on" id="orientation-btn" title="Direction up (tap for north up)" aria-label="Toggle map orientation"><i class="mi" id="orientation-icon">explore</i></button><button class="round" id="settings-btn" title="Settings"><i class="mi">tune</i></button><button class="round" id="audio-btn" title="Mute or unmute"><i class="mi" id="audio-icon">volume_up</i></button></div>
     <section class="planning glass" id="planning">
       <div class="field-label">Destination • FREE bicycle routing</div>
       <div class="search-row"><i class="mi">search</i><input id="destination" placeholder="Type an address or place" autocomplete="street-address" aria-label="Destination"><button class="small-icon" id="clear-destination" aria-label="Clear destination"><i class="mi">close</i></button></div>
@@ -96,6 +100,7 @@
     <div class="sheet-title"><span>e-Moto Settings</span><button class="small-icon" id="close-settings" aria-label="Close settings"><i class="mi">close</i></button></div>
     <div class="setting"><div>Estimated battery (%)<small>Manually update after charging</small></div><input id="battery-setting" type="number" min="0" max="100" value="100"></div>
     <div class="setting"><div>Full-charge range (km)</div><input id="range-setting" type="number" min="1" max="500" value="35"></div>
+    <div class="setting"><div>Direction-up map<small>Rotates to your direction while riding; stationary = hold last heading</small></div><input type="checkbox" id="direction-setting" checked style="width:20px;height:20px;accent-color:#409bff"></div>
     <div class="setting"><div>Camera zoom<small>Tesla wide recommended</small></div><select id="zoom-setting"><option value="wide">Tesla wide</option><option value="far">Far ahead</option><option value="near">Near</option></select></div>
     <div class="setting"><div>Automatic Free Ride<small>Begins after stable GPS movement</small></div><input type="checkbox" id="autoride-setting" checked style="width:20px;height:20px;accent-color:#409bff"></div>
     <div class="setting"><div>Reset trip meter</div><button class="ghost" id="reset-trip">RESET</button></div>
@@ -119,8 +124,8 @@ const state={
   riding:false,mode:'free',autoRide:prior.autoRide!==false,muted:!!prior.muted,
   batteryStart:clamp(Number.isFinite(+prior.batteryStart)?+prior.batteryStart:100,0,100),
   fullRange:Math.max(1,+prior.fullRange||35),tripM:Math.max(0,+prior.tripM||0),
-  bikeWidth:Math.max(1.5,+prior.bikeWidth||2.2),zoom:prior.zoomStyle||'wide',
-  speedKph:0,heading:null,progress:0,nextTurn:0,voiceMarks:new Set(),moveCount:0,
+  bikeWidth:Math.max(1.5,+prior.bikeWidth||2.2),zoom:prior.zoomStyle||'wide',directionUp:prior.directionUp!==false,
+  speedKph:0,heading:null,headingAt:0,progress:0,nextTurn:0,voiceMarks:new Set(),moveCount:0,
   lastSave:0,lastCamera:0,lastReroute:0,offRouteCount:0,overviewUntil:0,
   geocoding:false,safetyBusy:false,routingBusy:false,lastLocationAt:0,
   offRouteSince:0
@@ -132,6 +137,7 @@ function fmtMin(sec){return `${Math.max(1,Math.round(sec/60))} min`}
 function safeHTML(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function meters(a,b){if(!a||!b)return Infinity;let p=a.lat*Math.PI/180,q=b.lat*Math.PI/180,d=(b.lat-a.lat)*Math.PI/180,e=(b.lng-a.lng)*Math.PI/180;return 12742000*Math.asin(Math.min(1,Math.sqrt(Math.sin(d/2)**2+Math.cos(p)*Math.cos(q)*Math.sin(e/2)**2)))}
 function bearing(a,b){const x=a.lat*Math.PI/180,y=b.lat*Math.PI/180,z=(b.lng-a.lng)*Math.PI/180;return (Math.atan2(Math.sin(z)*Math.cos(y),Math.cos(x)*Math.sin(y)-Math.sin(x)*Math.cos(y)*Math.cos(z))*180/Math.PI+360)%360}
+function angularDelta(from,to){return ((to-from+540)%360)-180}
 function ahead(p,deg,dist){let r=6378137,x=deg*Math.PI/180,d=dist/r,a=p.lat*Math.PI/180,b=p.lng*Math.PI/180,c=Math.asin(Math.sin(a)*Math.cos(d)+Math.cos(a)*Math.sin(d)*Math.cos(x)),e=b+Math.atan2(Math.sin(x)*Math.sin(d)*Math.cos(a),Math.cos(d)-Math.sin(a)*Math.sin(c));return{lat:c*180/Math.PI,lng:e*180/Math.PI}}
 function routeMeters(route){if(!route||!route.points)return 0;return route.distance||route.points.reduce((n,p,i)=>n+(i?meters(route.points[i-1],p):0),0)}
 function battery(){return Math.max(0,state.batteryStart-state.tripM/(state.fullRange*1000)*100)}
@@ -139,9 +145,10 @@ function toast(msg,ms=2800){const el=$('toast');el.textContent=msg;el.style.disp
 function status(msg){$('status').textContent=msg}
 function speak(text,urgent=false){if(state.muted||!text||!window.speechSynthesis)return;try{if(urgent)speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='en-PH';u.rate=1.02;speechSynthesis.speak(u)}catch(_){}}
 function save(force=false){const now=Date.now();if(!force&&now-state.lastSave<7000)return;state.lastSave=now;
- try{const route=state.routes[state.selected];localStorage.setItem(STORAGE,JSON.stringify({dest:state.dest,destPoint:state.destPoint,route:route?{...route,points:route.points.map(p=>({lat:+p.lat.toFixed(5),lng:+p.lng.toFixed(5)}))}:null,batteryStart:state.batteryStart,fullRange:state.fullRange,tripM:state.tripM,autoRide:state.autoRide,muted:state.muted,zoomStyle:state.zoom,bikeWidth:state.bikeWidth,riding:state.riding,mode:state.mode,savedAt:Date.now()}));}catch(_){}}
+ try{const route=state.routes[state.selected];localStorage.setItem(STORAGE,JSON.stringify({dest:state.dest,destPoint:state.destPoint,route:route?{...route,points:route.points.map(p=>({lat:+p.lat.toFixed(5),lng:+p.lng.toFixed(5)}))}:null,batteryStart:state.batteryStart,fullRange:state.fullRange,tripM:state.tripM,autoRide:state.autoRide,muted:state.muted,zoomStyle:state.zoom,bikeWidth:state.bikeWidth,directionUp:state.directionUp,riding:state.riding,mode:state.mode,savedAt:Date.now()}));}catch(_){}}
 function dash(){const b=battery();$('speed').textContent=Math.round(state.speedKph);$('battery').textContent=`${Math.round(b)}%`;$('range').textContent=`${num(b/100*state.fullRange)} km`;$('trip').textContent=`${num(state.tripM/1000)} km`;}
-function initMap(){state.map=L.map('free-map',{zoomControl:false,preferCanvas:true,zoomSnap:.25,zoomDelta:.5}).setView([14.6,121.17],15.5);
+function initMap(){state.map=L.map('free-map',{zoomControl:false,preferCanvas:true,zoomSnap:.25,zoomDelta:.5,rotate:true,bearing:0,touchRotate:false,dragRotate:false,rotateControl:false}).setView([14.6,121.17],15.5);
+ if(typeof state.map.setBearing==='function')state.map.on('rotate',syncArrowOrientation);
  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>'}).addTo(state.map);
  state.map.on('click',e=>{if(state.riding)return;setDestination({lat:e.latlng.lat,lng:e.latlng.lng},'Pinned on map');toast('Pin selected • Tap FIND ROUTES');});
  if(state.destPoint)addPin(state.destPoint);
@@ -160,7 +167,7 @@ function chooseRoute(index){if(!state.routes[index]||state.routes[index].blocked
 function redrawRoutes(){if(!state.map)return;for(const l of state.layers)state.map.removeLayer(l);state.layers=[];
  state.routes.forEach((r,i)=>{if(!r.points?.length)return;const selected=(i===state.selected);let style={color:selected?'#1260cf':'#8b9db4',weight:selected?9:6,opacity:selected?1:.58};const under=L.polyline(r.points,{color:selected?'#fff':'#fff',weight:style.weight+4,opacity:selected?.93:.4,interactive:false}).addTo(state.map);const line=L.polyline(r.points,{...style,interactive:true}).addTo(state.map);if(selected){under.bringToFront();line.bringToFront()}else{under.bringToBack();line.bringToBack()}line.on('click',()=>chooseRoute(i));state.layers.push(under,line)});
 }
-function routeBounds(){const r=state.routes[state.selected];if(r?.points.length)state.map.fitBounds(L.latLngBounds(r.points.map(p=>[p.lat,p.lng])),{padding:[48,55],maxZoom:15.5,animate:false})}
+function routeBounds(){resetMapOrientation();const r=state.routes[state.selected];if(r?.points.length)state.map.fitBounds(L.latLngBounds(r.points.map(p=>[p.lat,p.lng])),{padding:[48,55],maxZoom:15.5,animate:false})}
 function drawChoices(){const wrap=$('route-options');wrap.replaceChildren();if(!state.routes.length){wrap.style.display='none';return;}wrap.style.display='flex';
  state.routes.forEach((r,i)=>{const b=document.createElement('button');b.type='button';b.className=`route-option ${i===state.selected?'selected':''}`;b.disabled=!!r.blocked;
  let audit=r.blocked?'REJECTED • narrow/path risk':r.audit==='checked'?'No known narrow tag at sampled points':r.audit==='unknown'?'Width tags could not be checked':'Width tags not verified';
@@ -235,12 +242,49 @@ async function geocodePlace(){if(state.geocoding)return;const query=$('destinati
  const btn=document.createElement('button');btn.className='place-result';btn.textContent=name;btn.addEventListener('click',()=>{box.style.display='none';setDestination(p,name);findRoutes()});box.appendChild(btn)}toast('Choose the correct place from search results.');
  }catch(e){toast('Place search unavailable. Tap map to pin.')}finally{state.geocoding=false;status('BIKE • AVOID TOLL • ROAD FIRST')}
 }
+function resetMapOrientation(){
+ if(!state.map)return;
+ try{if(typeof state.map.stopHeadingUp==='function')state.map.stopHeadingUp();
+ if(typeof state.map.setBearing==='function')state.map.setBearing(0);}catch(_){}
+ syncArrowOrientation();
+}
+function syncArrowOrientation(){
+ const el=state.marker?.getElement()?.querySelector('.gps-arrow');if(!el)return;
+ const bearingNow=typeof state.map?.getBearing==='function'?state.map.getBearing():0;
+ const angle=(Number.isFinite(state.heading)?state.heading:0)+bearingNow;
+ el.style.transform=`rotate(${angle}deg)`;
+}
+function refreshOrientationButton(){
+ const enabled=state.directionUp;
+ $('orientation-icon').textContent=enabled?'explore':'north';
+ $('orientation-btn').classList.toggle('heading-on',enabled);
+ $('orientation-btn').title=enabled?'Direction-up ON • Tap for north-up':'North-up ON • Tap for direction-up';
+ $('direction-setting').checked=enabled;
+}
+function applyRideOrientation(){
+ if(!state.map||!state.riding||!state.directionUp||Date.now()<state.overviewUntil)return;
+ if(typeof state.map.setBearing!=='function')return; // CDN unavailable -> safe north-up fallback
+ let heading=state.heading;
+ if(!(Number.isFinite(heading)&&Date.now()-state.headingAt<12000)){
+   // GPS course is missing: borrow route direction only if near the selected route and actually moving.
+   const r=state.mode==='route'?state.routes[state.selected]:null;
+   if(r?.points?.length && state.speedKph>3){const nearest=nearestOnRoute(r,state.gps);
+     if(nearest.distance<50){const i=nearest.index;heading=bearing(r.points[i],r.points[Math.min(r.points.length-1,i+5)]);}
+   }
+ }
+ if(!Number.isFinite(heading))return; // don't spin when stationary or GPS heading unreliable
+ try{
+   if(typeof state.map.setHeading==='function')state.map.setHeading(heading,{ease:0.22,deadzone:1.1});
+   else state.map.setBearing((360-heading)%360);
+ }catch(_){}
+ syncArrowOrientation();
+}
 function beginRide(forceFree=false,silent=false){if(state.riding)return;if(!state.gps){toast('Allow GPS first');return}if(state.safetyBusy&&!forceFree){toast('Wait for narrow-road check, or choose Free Ride.',4000);return}
  state.mode=!forceFree&&state.routes[state.selected]&&!state.routes[state.selected].blocked?'route':'free';state.riding=true;state.moveCount=0;state.prevGps=state.gps;state.nextTurn=0;state.voiceMarks.clear();state.offRouteCount=0;state.overviewUntil=0;
- document.body.classList.add('riding');$('nav-label').textContent=state.mode==='route'?'NEXT TURN':'FREE RIDE';$('turn-heading').textContent=state.mode==='route'?'Follow your route':'Free Ride';$('turn-road').textContent=state.mode==='route'?'Voice guidance active':'No destination • GPS tracking';$('turn-icon').textContent='navigation';
+ document.body.classList.add('riding');refreshOrientationButton();if(state.directionUp&&typeof state.map.setBearing!=='function')toast('Direction-up unavailable. Check internet; map will stay north-up.',5000);$('nav-label').textContent=state.mode==='route'?'NEXT TURN':'FREE RIDE';$('turn-heading').textContent=state.mode==='route'?'Follow your route':'Free Ride';$('turn-road').textContent=state.mode==='route'?'Voice guidance active':'No destination • GPS tracking';$('turn-icon').textContent='navigation';
  if(!silent)speak(state.mode==='route'?'Bike road-first navigation started. Verify road width, signs and access before following.':'Free ride started.');follow(true);updateProgress();save(true);
 }
-function endRide(){if(!state.riding)return;state.riding=false;state.mode='free';document.body.classList.remove('riding');state.moveCount=0;speak('Ride ended.',true);save(true);follow(true)}
+function endRide(){if(!state.riding)return;state.riding=false;state.mode='free';document.body.classList.remove('riding');state.moveCount=0;resetMapOrientation();speak('Ride ended.',true);save(true);follow(true)}
 function onGPS(position){const c=position.coords;const gps={lat:c.latitude,lng:c.longitude},now=Date.now(),accuracy=c.accuracy||999;
  if(accuracy>130&&!state.gps)return;
  const prev=state.gps;const dt=(now-state.lastLocationAt)/1000;
@@ -248,14 +292,22 @@ function onGPS(position){const c=position.coords;const gps={lat:c.latitude,lng:c
  state.gps=gps;state.lastLocationAt=now;const delta=prev&&dt>=1.5?meters(prev,gps):0;
  const inferredSpeed=accuracy<=35&&dt>=1.5&&delta>Math.max(9,accuracy*.85)&&delta<Math.min(130,dt*20)?delta/dt*3.6:0;
  const gpsSpeed=Number.isFinite(c.speed)&&c.speed>=0?c.speed*3.6:0;const newSpeed=Math.max(gpsSpeed,inferredSpeed);state.speedKph=newSpeed;
- if(Number.isFinite(c.heading)&&c.heading>=0)state.heading=c.heading;
+ // Heading is trustworthy while in motion. Below that, keep last known heading to prevent spinning.
+ let measured=null;
+ if(newSpeed>=4.0 && accuracy<=60 && Number.isFinite(c.heading) && c.heading>=0)measured=c.heading;
+ else if(prev&&dt>=0.9&&dt<=18&&accuracy<=35){const courseDist=meters(prev,gps);if(courseDist>=Math.max(10,accuracy*.75)&&courseDist/dt*3.6>=4)measured=bearing(prev,gps);}
+ if(Number.isFinite(measured)){
+   const rate=state.heading===null?1:(Math.abs(angularDelta(state.heading,measured))>100?0.35:0.6);
+   state.heading=((state.heading??measured)+angularDelta(state.heading??measured,measured)*rate+360)%360;
+   state.headingAt=now;
+ }
  if(!state.marker){state.marker=L.marker([gps.lat,gps.lng],{icon:L.divIcon({className:'',html:'<div class="gps-arrow"><i class="mi">navigation</i></div>',iconSize:[42,42],iconAnchor:[21,21]})}).addTo(state.map)}else state.marker.setLatLng([gps.lat,gps.lng]);
- if(state.marker){const m=state.marker.getElement();const arrow=m?.querySelector('.gps-arrow');if(arrow)arrow.style.transform=`rotate(${state.heading||0}deg)`}
+ syncArrowOrientation();
  $('accuracy').textContent=`${Math.round(accuracy)} m`;
  if(state.riding&&prev&&dt>0&&accuracy<55){const d=meters(prev,gps);if(d>3&&d<Math.min(120,dt*20+15)&&(newSpeed>1.5||d/dt>1.5)){state.tripM+=d;save();}}
  if(!state.riding&&state.autoRide&&!state.safetyBusy&&accuracy<35 && newSpeed>5){state.moveCount++;if(state.moveCount>=3)beginRide(!state.routes.some(r=>!r.blocked),false)}else if(!state.riding)state.moveCount=0;
  dash();if(!state.riding&&state.resumeRide){const free=state.resumeMode!=='route';state.resumeRide=false;beginRide(free,true);toast('Previous ride restored');}
- if(state.riding){updateProgress();follow();}else if(!prev)follow(true);
+ if(state.riding){updateProgress();applyRideOrientation();follow();}else if(!prev)follow(true);
 }
 function startGPS(){if(!navigator.geolocation){status('GPS not supported');toast('Your browser does not support geolocation');return}
  status('Waiting for GPS permission...');state.gpsWatch=navigator.geolocation.watchPosition(p=>{onGPS(p);if(state.gps&&$('status').textContent.includes('Waiting'))status('GPS ready • bike routing available')},err=>{status('Enable GPS & HTTPS • Free Ride needs location');if(err.code===1)toast('Location permission denied. Enable GPS for this site.',4000)}, {enableHighAccuracy:true,maximumAge:1500,timeout:18000});
@@ -283,15 +335,23 @@ async function reroute(){if(state.routingBusy||!state.destPoint||!state.gps)retu
  state.routes=[r];state.selected=0;state.nextTurn=0;state.voiceMarks.clear();redrawRoutes();drawChoices();toast('New bike route • width not rechecked');speak('New route is ready.',true);
  if(keepRiding)state.mode='route';save(true);
  }catch(_){toast('Could not recalculate. Pull over and review the map.',4500)}finally{if(token===state.requestId)state.routingBusy=false}}
-function follow(force=false){if(!state.map||!state.gps)return;const now=Date.now();if(!force&&(now<state.overviewUntil||now-state.lastCamera<1700))return;state.lastCamera=now;
+function follow(force=false){if(!state.map||!state.gps)return;const now=Date.now();if(now<state.overviewUntil)return;if(!force&&now-state.lastCamera<1700)return;state.lastCamera=now;
  const zoomBy={near:17.1,wide:16.2,far:15.6};let z=state.riding?zoomBy[state.zoom]||16.2:15.8;
  if(state.riding&&state.speedKph>45)z-=.4;
  let focused=state.gps;
- if(state.riding){let roadHead=state.heading;const r=state.routes[state.selected];if(state.mode==='route'&&r?.points?.length){const x=nearestOnRoute(r,state.gps).index;roadHead=bearing(r.points[x],r.points[Math.min(r.points.length-1,x+6)]);}if(!Number.isFinite(roadHead))roadHead=0;focused=ahead(state.gps,roadHead,state.mode==='route'?Math.min(220,85+state.speedKph*2.5):55)}
- state.map.setView([focused.lat,focused.lng],z,{animate:false});}
-function overview(){const r=state.routes[state.selected];if(!r){follow(true);return}state.overviewUntil=Date.now()+9000;routeBounds();toast('Full route • returns to follow in 9 sec')}
+ if(state.riding){
+   let roadHead=Date.now()-state.headingAt<12000?state.heading:null;
+   const r=state.routes[state.selected];
+   if(!Number.isFinite(roadHead)&&state.mode==='route'&&r?.points?.length){
+     const nearest=nearestOnRoute(r,state.gps);if(nearest.distance<50){const x=nearest.index;roadHead=bearing(r.points[x],r.points[Math.min(r.points.length-1,x+6)]);}
+   }
+   if(Number.isFinite(roadHead))focused=ahead(state.gps,roadHead,state.mode==='route'?Math.min(220,85+state.speedKph*2.5):Math.min(145,55+state.speedKph*1.3));
+ }
+ state.map.setView([focused.lat,focused.lng],z,{animate:false});
+ if(state.riding)applyRideOrientation();else resetMapOrientation();}
+function overview(){const r=state.routes[state.selected];if(!r){follow(true);return}state.overviewUntil=Date.now()+9000;routeBounds();toast('Full route • returns to direction-up in 9 sec')}
 function bind(){
- $('destination').value=state.dest;$('battery-setting').value=state.batteryStart;$('range-setting').value=state.fullRange;$('autoride-setting').checked=state.autoRide;$('width-setting').value=state.bikeWidth;$('zoom-setting').value=state.zoom;$('audio-icon').textContent=state.muted?'volume_off':'volume_up';dash();
+ $('destination').value=state.dest;$('battery-setting').value=state.batteryStart;$('range-setting').value=state.fullRange;$('autoride-setting').checked=state.autoRide;$('width-setting').value=state.bikeWidth;$('zoom-setting').value=state.zoom;refreshOrientationButton();$('audio-icon').textContent=state.muted?'volume_off':'volume_up';dash();
  $('destination').addEventListener('input',()=>{state.searchId++;$('place-results').style.display='none';state.dest=$('destination').value;state.destPoint=null;clearRoutes(false);if(state.pin){state.map.removeLayer(state.pin);state.pin=null;}save(true)});
  $('destination').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();findRoutes()}});
  $('find-route').addEventListener('click',()=>findRoutes());
@@ -300,12 +360,13 @@ function bind(){
  $('start-ride').addEventListener('click',()=>beginRide(!state.routes.length||state.routes.every(r=>r.blocked)));
  $('end-ride').addEventListener('click',endRide);
  $('recenter').addEventListener('click',()=>{state.overviewUntil=0;follow(true)});$('overview').addEventListener('click',overview);
+ $('orientation-btn').addEventListener('click',()=>{state.directionUp=!state.directionUp;refreshOrientationButton();if(!state.directionUp)resetMapOrientation();else{state.overviewUntil=0;follow(true)}toast(state.directionUp?'Direction-up map enabled':'North-up map enabled');save(true)});
  $('settings-btn').addEventListener('click',()=>{$('settings-sheet').classList.add('open')});$('close-settings').addEventListener('click',()=>{$('settings-sheet').classList.remove('open')});
  $('settings-sheet').addEventListener('click',e=>{if(e.target===$('settings-sheet'))$('settings-sheet').classList.remove('open')});
  $('audio-btn').addEventListener('click',()=>{state.muted=!state.muted;if(state.muted&&window.speechSynthesis)speechSynthesis.cancel();$('audio-icon').textContent=state.muted?'volume_off':'volume_up';save(true)});
- $('save-settings').addEventListener('click',()=>{const oldWidth=state.bikeWidth;state.batteryStart=clamp(+$('battery-setting').value||0,0,100);state.fullRange=Math.max(1,+$('range-setting').value||35);state.bikeWidth=Math.max(1.5,+$('width-setting').value||2.2);state.zoom=$('zoom-setting').value;state.autoRide=$('autoride-setting').checked;const widthChanged=Math.abs(oldWidth-state.bikeWidth)>.05&&state.routes.length;if(widthChanged)clearRoutes(false);dash();save(true);$('settings-sheet').classList.remove('open');toast(widthChanged?'Width changed • Tap FIND ROUTES again':'Settings saved',widthChanged?4000:2800);});
+ $('save-settings').addEventListener('click',()=>{const oldWidth=state.bikeWidth;state.batteryStart=clamp(+$('battery-setting').value||0,0,100);state.fullRange=Math.max(1,+$('range-setting').value||35);state.bikeWidth=Math.max(1.5,+$('width-setting').value||2.2);state.zoom=$('zoom-setting').value;state.directionUp=$('direction-setting').checked;if(!state.directionUp)resetMapOrientation();else if(state.riding){state.overviewUntil=0;follow(true);}refreshOrientationButton();state.autoRide=$('autoride-setting').checked;const widthChanged=Math.abs(oldWidth-state.bikeWidth)>.05&&state.routes.length;if(widthChanged)clearRoutes(false);dash();save(true);$('settings-sheet').classList.remove('open');toast(widthChanged?'Width changed • Tap FIND ROUTES again':'Settings saved',widthChanged?4000:2800);});
  $('reset-trip').addEventListener('click',()=>{state.batteryStart=battery();state.tripM=0;$('battery-setting').value=state.batteryStart;dash();save(true);toast('Trip meter reset')});
- document.addEventListener('visibilitychange',()=>{save(true);if(document.visibilityState==='visible'){state.map.invalidateSize();follow(true)}});window.addEventListener('pagehide',()=>save(true));
+ document.addEventListener('visibilitychange',()=>{save(true);if(document.visibilityState==='visible'){state.map.invalidateSize();follow(true)}else if(typeof state.map?.stopHeadingUp==='function')state.map.stopHeadingUp()});window.addEventListener('pagehide',()=>save(true));
 }
 initMap();bind();startGPS();
 if(state.routes.length){state.selected=0;redrawRoutes();drawChoices();chooseRoute(0);status('Saved bike route restored • Verify road conditions');}
