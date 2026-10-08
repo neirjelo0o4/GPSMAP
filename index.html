@@ -75,7 +75,19 @@
     .status.route-alert{background:rgba(108,43,24,.93);border-color:rgba(255,180,82,.75);color:#fff0cd;max-width:235px}
     .toast{position:fixed;z-index:30;top:48%;left:50%;transform:translate(-50%,-50%);padding:13px 17px;border-radius:13px;color:#fff;background:#172231e9;box-shadow:var(--shadow);max-width:min(360px,90vw);text-align:center;font-size:12px;line-height:1.55;font-weight:700;display:none;pointer-events:none}
     .scrim{position:fixed;inset:0;z-index:50;background:#080c13be;display:grid;place-items:center;padding:15px}.setup{width:min(490px,100%);background:#111b28;border:1px solid #ffffff24;border-radius:25px;box-shadow:0 25px 60px #0009;padding:25px;color:white;max-height:94vh;overflow-y:auto}.setup-icon{width:47px;height:47px;border-radius:14px;background:#16395a;display:grid;place-items:center;color:#8bc9ff}.setup h1{font-size:23px;line-height:1.25;margin:17px 0 9px}.setup p{color:#b5c7d8;line-height:1.6;font-size:12px;margin:0 0 14px}.setup label{display:block;color:#d4e3f2;font-size:11px;font-weight:800;margin:15px 0 7px}.setup input{width:100%;background:#0b121c;border:1px solid #41546a;border-radius:12px;color:white;font:600 13px Inter,sans-serif;padding:13px}.setup .primary{width:100%;padding:14px;margin-top:12px}.setup a{color:#95caff}.disclaimer{font-size:11px;line-height:1.65;border-left:3px solid #ffbd62;padding:10px 13px;background:#ffffff09;border-radius:5px;color:#d8e3ee}.error-note{color:#ffb7ac;font-size:11px;min-height:14px;margin-top:7px}
-    .sheet{display:none;position:fixed;z-index:40;inset:0;background:#070c13a4;align-items:center;justify-content:center;padding:16px}.sheet.open{display:flex}.sheet-panel{width:min(430px,100%);padding:20px;background:#142030;border:1px solid #ffffff20;border-radius:22px;box-shadow:var(--shadow)}.sheet-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:15px;font-weight:900}.setting{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;font-size:12px;border-bottom:1px solid #ffffff13}.setting input{width:75px;border:1px solid #ffffff35;border-radius:9px;background:#090f18;color:white;padding:10px;font-size:12px}.setting small{display:block;color:#aac1d7;margin-top:3px}.setting select{color:white;background:#090f18;border:1px solid #ffffff35;padding:10px;border-radius:8px}
+    .sheet{display:none;position:fixed;z-index:50;inset:0;background:#070c13b8;align-items:center;justify-content:center;padding:10px max(10px,env(safe-area-inset-right)) 10px max(10px,env(safe-area-inset-left));overscroll-behavior:contain}
+    .sheet.open{display:flex}
+    .sheet-panel{width:min(430px,100%);max-height:calc(100% - 2px);min-height:0;display:flex;flex-direction:column;overflow:hidden;padding:0;background:#142030;border:1px solid #ffffff20;border-radius:19px;box-shadow:var(--shadow)}
+    .sheet-title{display:flex;align-items:center;justify-content:space-between;font-weight:900;padding:14px 17px 11px;flex:0 0 auto;border-bottom:1px solid #ffffff17}
+    .settings-scroll{flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;padding:3px 17px 10px;scrollbar-width:thin;scrollbar-color:#6581a0 transparent}
+    .settings-footer{display:flex;flex:0 0 auto;padding:10px 17px calc(10px + env(safe-area-inset-bottom));border-top:1px solid #ffffff22;background:#142030;box-shadow:0 -10px 20px rgba(0,0,0,.14)}
+    .settings-footer #save-settings{display:block;width:100%;min-height:44px;margin:0!important;flex:1}
+
+    /* The landscape Android browser can have a smaller *visible* viewport than 100vh.
+       Keep the dialog and Save button inside that visible rectangle. */
+    .sheet.open{top:var(--nav-visual-top,0px);left:var(--nav-visual-left,0px);right:auto;bottom:auto;width:var(--nav-visual-width,100vw);height:var(--nav-visual-height,100dvh)}
+    @media (orientation:landscape) and (max-height:510px){.sheet{padding-top:5px;padding-bottom:5px}.sheet-panel{width:min(550px,96%);border-radius:14px}.sheet-title{padding:7px 13px 6px;font-size:13px}.settings-scroll{padding:0 13px 4px}.settings-scroll .setting{padding:6px 0;font-size:11px}.settings-scroll .setting small{font-size:9px}.settings-scroll .setting input:not([type=checkbox]),.settings-scroll .setting select{padding:7px;font-size:12px}.settings-footer{padding:6px 13px max(6px,env(safe-area-inset-bottom))}.settings-footer #save-settings{min-height:38px}}
+    .setting{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;font-size:12px;border-bottom:1px solid #ffffff13}.setting input{width:75px;border:1px solid #ffffff35;border-radius:9px;background:#090f18;color:white;padding:10px;font-size:12px}.setting small{display:block;color:#aac1d7;margin-top:3px}.setting select{color:white;background:#090f18;border:1px solid #ffffff35;padding:10px;border-radius:8px}
     @media(max-width:640px){.planning{top:calc(69px + env(safe-area-inset-top));padding:12px}.route-options{top:calc(310px + env(safe-area-inset-top));max-height:24vh}.dashboard{width:158px;bottom:calc(106px + env(safe-area-inset-bottom));right:10px;padding:12px}.speed{font-size:52px}.dash-cell strong{font-size:12px}.recenter{bottom:calc(291px + env(safe-area-inset-bottom))}.status{top:calc(65px + env(safe-area-inset-top));right:10px;max-width:135px}.nav-header{padding:14px}.turn-main{font-size:20px;max-width:220px}.nav-footer{padding:12px;gap:8px}.nav-metric b{font-size:17px}}
     @media(orientation:landscape) and (max-height:700px){
       .appmark{display:none}
@@ -492,8 +504,9 @@ body.riding .ui>.status:not(.gps-alert):not(.route-alert){display:none!important
   <div class="toast" id="toast" role="status"></div>
   <script>window.addEventListener("load",()=>{if(typeof L==="undefined"){document.getElementById("status").textContent="Map library failed to load • Check internet";}});</script>
 
-  <div class="sheet" id="settings-sheet"><div class="sheet-panel">
+  <div class="sheet" id="settings-sheet" role="dialog" aria-modal="true" aria-label="e-Moto Settings"><div class="sheet-panel">
     <div class="sheet-title"><span>e-Moto Settings</span><button class="small-icon" id="close-settings" aria-label="Close settings"><i class="mi">close</i></button></div>
+    <div class="settings-scroll" id="settings-scroll" tabindex="0" aria-label="Scrollable settings options">
     <div class="setting"><div>Estimated battery (%)<small>Manually update after charging</small></div><input id="battery-setting" type="number" min="0" max="100" value="100"></div>
     <div class="setting"><div>Full-charge range (km)</div><input id="range-setting" type="number" min="1" max="500" value="35"></div>
     <div class="setting"><div>0–100% charge time (hours)<small>Used for voice charging-time estimates</small></div><input id="charge-setting" type="number" min="1" max="24" step="0.5" value="8"></div>
@@ -503,7 +516,8 @@ body.riding .ui>.status:not(.gps-alert):not(.route-alert){display:none!important
     <div class="setting"><div>Automatic Free Ride<small>Begins after stable GPS movement</small></div><input type="checkbox" id="autoride-setting" checked style="width:20px;height:20px;accent-color:#409bff"></div>
     <div class="setting"><div>Reset trip meter</div><button class="ghost" id="reset-trip">RESET</button></div>
     <div class="setting"><div>Minimum mapped road width<small>Only where tagged in OpenStreetMap</small></div><input id="width-setting" type="number" min="1.5" max="5" step="0.1" value="2.2"></div>
-    <button class="primary" id="save-settings" style="width:100%;margin-top:17px">SAVE SETTINGS</button>
+    </div>
+    <div class="settings-footer"><button class="primary" id="save-settings" type="button">SAVE SETTINGS</button></div>
   </div></div>
 
 <script>
@@ -950,8 +964,9 @@ function bind(){
  $('recenter').addEventListener('click',()=>{if(!state.gps||Date.now()-state.lastLocationAt>25000)startGPS();state.overviewUntil=0;follow(true)});$('overview').addEventListener('click',overview);
  $('status').addEventListener('click',()=>{if(window.isSecureContext===false){toast('GPS needs HTTPS. Publish this HTML on Cloudflare Pages / GitHub Pages instead of opening it as a local file.',8500);return;}startGPS();toast('Requesting GPS again…',2000)});
  $('orientation-btn').addEventListener('click',()=>{state.directionUp=!state.directionUp;refreshOrientationButton();if(!state.directionUp)resetMapOrientation();else{state.overviewUntil=0;follow(true)}toast(state.directionUp?'Direction-up map enabled':'North-up map enabled');save(true)});
- $('settings-btn').addEventListener('click',()=>{$('battery-setting').value=Math.round(battery());$('charge-setting').value=state.fullChargeHours;$('direction-setting').checked=state.directionUp;$('pseudo3d-setting').checked=state.pseudo3d;$('zoom-setting').value=state.zoom;$('autoride-setting').checked=state.autoRide;$('width-setting').value=state.bikeWidth;$('settings-sheet').classList.add('open')});$('close-settings').addEventListener('click',()=>{$('settings-sheet').classList.remove('open')});
+ $('settings-btn').addEventListener('click',()=>{$('battery-setting').value=Math.round(battery());$('charge-setting').value=state.fullChargeHours;$('direction-setting').checked=state.directionUp;$('pseudo3d-setting').checked=state.pseudo3d;$('zoom-setting').value=state.zoom;$('autoride-setting').checked=state.autoRide;$('width-setting').value=state.bikeWidth;$('settings-sheet').classList.add('open');$('settings-scroll').scrollTop=0;});$('close-settings').addEventListener('click',()=>{$('settings-sheet').classList.remove('open')});
  $('settings-sheet').addEventListener('click',e=>{if(e.target===$('settings-sheet'))$('settings-sheet').classList.remove('open')});
+ $('settings-scroll').addEventListener('focusin',e=>{if(e.target?.matches('input,select'))setTimeout(()=>e.target.scrollIntoView({block:'nearest',behavior:'instant'}),100)});
  $('audio-btn').addEventListener('click',()=>{state.muted=!state.muted;if(state.muted&&window.speechSynthesis)speechSynthesis.cancel();$('audio-icon').textContent=state.muted?'volume_off':'volume_up';save(true)});
  $('save-settings').addEventListener('click',()=>{const oldWidth=state.bikeWidth;const newBattery=clamp(Number($('battery-setting').value),0,100);
  if(Number.isFinite(newBattery)&&Math.abs(newBattery-battery())>0.75){state.batteryStart=newBattery;state.tripM=0;state.batteryUncertain=false;}
