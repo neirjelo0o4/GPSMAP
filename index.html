@@ -26,6 +26,16 @@
     body:not(.riding) #free-map::after{height:18vh;background:linear-gradient(to top,rgba(4,8,12,.16),rgba(4,8,12,0))}
     .ui{position:fixed;inset:0;pointer-events:none;z-index:9;overflow:hidden}
     .ui>*{pointer-events:auto}.glass{background:var(--glass);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:21px;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
+    .appmark,.planning,.route-options,.place-results,.status,.dashboard,.bottom,.nav-header,.nav-footer,.recenter,.top-actions{max-width:calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right))}
+    .appmark{left:calc(12px + env(safe-area-inset-left))}
+    .top-actions{right:calc(12px + env(safe-area-inset-right));max-width:calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right));flex-wrap:wrap;justify-content:flex-end}
+    .planning{left:calc(12px + env(safe-area-inset-left));width:min(370px,calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)))}
+    .route-options{left:calc(12px + env(safe-area-inset-left));width:min(370px,calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)))}
+    .dashboard{right:calc(12px + env(safe-area-inset-right))}
+    .status{right:calc(12px + env(safe-area-inset-right))}
+    .recenter{right:calc(12px + env(safe-area-inset-right))}
+    .nav-header{left:calc(12px + env(safe-area-inset-left));width:min(420px,calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)))}
+    .bottom,.nav-footer{width:min(570px,calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)))}
     .appmark{position:absolute;left:15px;top:calc(13px + env(safe-area-inset-top));padding:8px 12px 8px 10px;display:flex;align-items:center;gap:9px;font-size:12px;font-weight:800;letter-spacing:.4px}
     .appmark i{color:#65b6ff;font-size:23px}.appmark em{font-size:9px;font-style:normal;color:var(--muted);display:block;letter-spacing:1.6px;margin-top:2px}
     .top-actions{position:absolute;right:14px;top:calc(13px + env(safe-area-inset-top));display:flex;gap:7px;z-index:11}
@@ -69,30 +79,33 @@
     @media(max-width:640px){.planning{top:calc(69px + env(safe-area-inset-top));padding:12px}.route-options{top:calc(310px + env(safe-area-inset-top));max-height:24vh}.dashboard{width:158px;bottom:calc(106px + env(safe-area-inset-bottom));right:10px;padding:12px}.speed{font-size:52px}.dash-cell strong{font-size:12px}.recenter{bottom:calc(291px + env(safe-area-inset-bottom))}.status{top:calc(65px + env(safe-area-inset-top));right:10px;max-width:135px}.nav-header{padding:14px}.turn-main{font-size:20px;max-width:220px}.nav-footer{padding:12px;gap:8px}.nav-metric b{font-size:17px}}
     @media(orientation:landscape) and (max-height:700px){
       .appmark{display:none}
-      .top-actions{top:calc(12px + env(safe-area-inset-top));right:12px}
+      .top-actions{top:calc(12px + env(safe-area-inset-top));right:calc(12px + env(safe-area-inset-right));gap:6px}
       body.riding .top-actions{top:calc(12px + env(safe-area-inset-top))}
-      .planning{top:calc(12px + env(safe-area-inset-top));left:12px;width:min(320px,42vw);max-height:calc(100vh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));overflow:auto;padding:12px}
-      .route-options{left:calc(min(320px,42vw) + 24px);top:calc(12px + env(safe-area-inset-top));width:min(270px,32vw);max-height:calc(100vh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}
-      .place-results{left:12px;top:calc(186px + env(safe-area-inset-top));width:min(320px,42vw);max-height:42vh}
-      .dashboard{right:12px;bottom:calc(12px + env(safe-area-inset-bottom));width:156px;padding:10px 11px}
-      .bottom{left:12px;transform:none;bottom:calc(12px + env(safe-area-inset-bottom));width:min(350px,45vw);padding:10px}
+      .planning{top:calc(12px + env(safe-area-inset-top));left:calc(12px + env(safe-area-inset-left));width:min(290px,42vw);max-height:44vh;overflow:auto;padding:11px}
+      .place-results{left:calc(12px + env(safe-area-inset-left));top:calc(176px + env(safe-area-inset-top));width:min(290px,42vw);max-height:28vh}
+      .route-options{left:calc(12px + env(safe-area-inset-left));top:auto;bottom:calc(78px + env(safe-area-inset-bottom));width:min(290px,42vw);max-height:27vh}
+      .dashboard{right:calc(12px + env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));width:142px;padding:10px}
+      .speed{font-size:46px}.dash-cell strong{font-size:11px}
+      .bottom{left:calc(12px + env(safe-area-inset-left));transform:none;bottom:calc(12px + env(safe-area-inset-bottom));width:min(320px,46vw);padding:10px}
       .trip-summary b{font-size:14px}.trip-summary span{font-size:9px}
-      .start{padding:12px 13px}
-      .status{top:auto;bottom:calc(92px + env(safe-area-inset-bottom));right:12px;max-width:156px}
-      .recenter{right:178px;bottom:calc(16px + env(safe-area-inset-bottom))}
-      .nav-header{top:calc(12px + env(safe-area-inset-top));left:12px;width:min(335px,43vw);padding:13px 14px}
-      .turn-main{font-size:18px;max-width:200px}.turn-minor{font-size:10px}
+      .start{padding:11px 12px}
+      .status{top:auto;bottom:calc(168px + env(safe-area-inset-bottom));right:calc(12px + env(safe-area-inset-right));max-width:142px}
+      .recenter{right:calc(12px + env(safe-area-inset-right));bottom:calc(148px + env(safe-area-inset-bottom))}
+      .nav-header{top:calc(12px + env(safe-area-inset-top));left:calc(12px + env(safe-area-inset-left));width:min(300px,44vw);padding:12px 13px}
+      .turn-main{font-size:18px;max-width:190px}.turn-minor{font-size:10px}
       .nav-header .next-turn .mi{font-size:34px}
-      .nav-footer{left:12px;transform:none;bottom:calc(12px + env(safe-area-inset-bottom));width:min(420px,56vw);padding:11px 12px;gap:9px}
-      .nav-metric b{font-size:16px}.nav-metric span{font-size:8px}
-      body.riding .dashboard{right:12px;bottom:calc(12px + env(safe-area-inset-bottom));width:146px}
-      body.riding .recenter{right:172px;bottom:calc(16px + env(safe-area-inset-bottom))}
+      .nav-footer{left:calc(12px + env(safe-area-inset-left));transform:none;bottom:calc(12px + env(safe-area-inset-bottom));width:min(380px,58vw);padding:10px 11px;gap:8px}
+      .nav-metric b{font-size:15px}.nav-metric span{font-size:8px}
+      body.riding .dashboard{right:calc(12px + env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));width:142px}
+      body.riding .recenter{right:calc(12px + env(safe-area-inset-right));bottom:calc(148px + env(safe-area-inset-bottom))}
     }
     @media(orientation:landscape) and (max-height:430px){
-      .round{width:40px;height:40px;border-radius:12px}.top-actions{gap:6px}
-      .planning{width:min(295px,40vw);padding:11px}.route-options{left:calc(min(295px,40vw) + 22px);width:min(250px,30vw)}
-      .dashboard{width:146px}.speed{font-size:46px}.dash-cell strong{font-size:11px}
-      .nav-header{width:min(305px,40vw)}.nav-footer{width:min(390px,54vw)}
+      .round{width:38px;height:38px;border-radius:11px}.top-actions{gap:5px}
+      .planning,.place-results,.route-options{width:min(265px,40vw)}
+      .dashboard{width:132px}.speed{font-size:41px}.dash-cell strong{font-size:10px}
+      .nav-header{width:min(280px,42vw)}.nav-footer{width:min(360px,56vw)}
+      .nav-metric b{font-size:14px}
+      .status{max-width:132px}
     }
     .place-results{position:absolute;top:calc(245px + env(safe-area-inset-top));left:14px;width:min(370px,calc(100vw - 28px));display:none;padding:5px;z-index:12;max-height:38vh;overflow:auto}
   .place-result{width:100%;text-align:left;color:white;background:transparent;border-bottom:1px solid #ffffff24;padding:12px 10px;font-size:12px;line-height:1.3}
