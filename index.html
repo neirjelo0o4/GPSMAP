@@ -1,2070 +1,316 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>E-Motorcycle Nav Pro - Tesla Navigation V4</title>
-    
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    
-    <style>
-        * { box-sizing: border-box; font-family: 'Segoe UI', Roboto, Arial, sans-serif; }
-        body { margin: 0; padding: 0; overflow: hidden; background: #111; color: #333; }
-        
-        #map-wrapper { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; overflow: hidden; background: #222; }
-        #map { position: absolute; inset: 0; width: 100vw; height: 100vh; z-index: 1; transform: none; }
-        .leaflet-routing-container { display: none !important; }
-        
-        /* SEARCH PANEL (NASA TAAS) */
-        .search-panel { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); width: 92%; max-width: 400px; z-index: 1005; background: rgba(255,255,255,0.68); border-radius: 18px; box-shadow: 0 10px 32px rgba(0,0,0,0.20); padding: 12px; transition: 0.3s; backdrop-filter: blur(18px) saturate(145%); -webkit-backdrop-filter: blur(18px) saturate(145%); border: 1px solid rgba(255,255,255,0.58); }
-        .search-panel.hidden { transform: translate(-50%, -150%); opacity: 0; pointer-events: none; }
-        
-        .stops-wrapper { max-height: 35vh; overflow-y: auto; padding-right: 5px; } 
-        
-        .input-row { display: flex; align-items: center; padding: 8px 5px; border-bottom: 1px solid rgba(80,80,80,0.13); position: relative; }
-        .input-row:last-child { border-bottom: none; }
-        .input-row i.loc-icon { color: #1a73e8; margin-right: 12px; font-size: 22px; }
-        .input-row i.remove-icon { color: #aaa; cursor: pointer; font-size: 22px; margin-left: 5px; transition: 0.2s; }
-        .input-row i.remove-icon:hover { color: #ea4335; }
-        .input-row input { border: none; font-size: 15px; font-weight: 700; outline: none; width: 100%; background: transparent; color: #444; }
-        .input-row input::placeholder { color: #999; font-weight: 500; }
-        
-        .action-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 5px 0px 5px; }
-        .btn-add-stop { background: none; border: none; color: #1a73e8; font-weight: 900; cursor: pointer; display: flex; align-items: center; font-size: 14px; padding: 5px; transition: 0.2s; }
-        .btn-add-stop:active { transform: scale(0.95); }
-        .btn-find-route { background: #1a73e8; color: white; border: none; border-radius: 25px; padding: 10px 20px; font-weight: 900; cursor: pointer; box-shadow: 0 4px 12px rgba(26,115,232,0.4); font-size: 14px; transition: 0.2s; }
-        .btn-find-route:active { transform: scale(0.95); }
-        
-        /* FIXED SUGGESTIONS BOX */
-        .suggestions { position: fixed; background: rgba(255,255,255,0.82); border-radius: 14px; box-shadow: 0 12px 34px rgba(0,0,0,0.26); max-height: 280px; overflow-y: auto; z-index: 9999; display: none; margin-top: 5px; border: 1px solid rgba(255,255,255,0.60); backdrop-filter: blur(18px) saturate(145%); -webkit-backdrop-filter: blur(18px) saturate(145%); }
-        .suggestion-item { padding: 15px 18px; display: flex; align-items: center; border-bottom: 1px solid rgba(80,80,80,0.10); cursor: pointer; font-size: 15px; transition: 0.2s; }
-        .suggestion-item:active { background: #f0f4f8; }
-        .search-loading { padding: 15px; text-align: center; color: #777; font-weight: bold; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 10px; }
-        
-        /* E-MOTORCYCLE DASHBOARD */
-        .ebike-dash { position: absolute; bottom: 130px; right: 15px; width: 175px; background: rgba(255,255,255,0.62); border-radius: 17px; box-shadow: 0 10px 28px rgba(0,0,0,0.18); padding: 12px; z-index: 999; backdrop-filter: blur(18px) saturate(145%); -webkit-backdrop-filter: blur(18px) saturate(145%); border: 1px solid rgba(255,255,255,0.58); transition: all 0.3s ease; }
-        .ebike-dash.smart-hidden { transform: translateX(120%) !important; opacity: 0; pointer-events: none; }
-        
-        .dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-        .dash-title { font-size: 13px; font-weight: 900; color: #333; text-transform: uppercase; letter-spacing: 1px; margin: 0; }
-        
-        .dash-controls { display: flex; gap: 5px; }
-        .info-btn { background: rgba(255,255,255,0.56); border: 1px solid rgba(255,255,255,0.52); color: #1a73e8; border-radius: 50%; width: 26px; height: 26px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-        .info-btn i { font-size: 16px; }
-        
-        #dash-content { transition: max-height 0.3s ease; overflow: hidden; max-height: 500px; }
-        
-        .dash-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; margin-top: 8px; font-size: 13px; font-weight: 800; color: #444; }
-        .dash-val { color: #1a73e8; font-size: 18px; font-weight: 900; }
-        .dash-val.red { color: #ea4335; }
-        
-        .bat-input-group { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 11px; font-weight: 800; color: #333; }
-        .bat-input-group input { width: 50px; border: 1px solid rgba(26,115,232,0.35); border-radius: 7px; padding: 4px; text-align: center; font-size: 13px; font-weight: 900; background: rgba(255,255,255,0.54); outline: none; transition: 0.2s; }
-        .bat-input-group input:focus { border-color: #1a73e8; }
-        
-        .btn-reset { width: 100%; background: #ea4335; color: white; border: none; padding: 8px; border-radius: 8px; font-weight: 900; cursor: pointer; margin-top: 6px; text-transform: uppercase; font-size: 11px; transition: 0.2s; box-shadow: 0 4px 10px rgba(234, 67, 53, 0.3); }
-        .btn-reset:active { transform: scale(0.95); }
-
-        /* BOTTOM ROUTE / START PANEL */
-        .bottom-panel { position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(255,255,255,0.66); border-radius: 22px 22px 0 0; padding: 14px 20px 18px 20px; z-index: 1000; box-shadow: 0 -10px 30px rgba(0,0,0,0.13); transition: 0.4s cubic-bezier(0.25, 1, 0.5, 1); display: flex; flex-direction: column; gap: 10px; backdrop-filter: blur(20px) saturate(145%); -webkit-backdrop-filter: blur(20px) saturate(145%); border-top: 1px solid rgba(255,255,255,0.58); }
-        .bottom-panel.hidden { transform: translateY(100%); }
-        .route-title { font-size: 20px; color: #188038; font-weight: 900; }
-        .route-desc { font-size: 12px; color: #555; font-weight: bold; }
-        
-        .btn-start { background: #1a73e8; color: white; border: none; border-radius: 30px; padding: 14px; font-size: 16px; font-weight: 900; cursor: pointer; width: 100%; display: flex; justify-content: center; align-items: center; gap: 10px; box-shadow: 0 6px 15px rgba(26, 115, 232, 0.3); transition: 0.2s; }
-        .btn-start:active { transform: scale(0.96); }
-        .btn-stop { background: #ea4335; display: none; box-shadow: 0 6px 15px rgba(234, 67, 53, 0.3); }
-
-        /* RECENTER BUTTON */
-        .btn-gps { position: absolute; bottom: 130px; left: 15px; width: 45px; height: 45px; background: rgba(255,255,255,0.66); border: 1px solid rgba(255,255,255,0.58); border-radius: 50%; box-shadow: 0 8px 22px rgba(0,0,0,0.18); display: flex; align-items: center; justify-content: center; cursor: pointer; color: #1a73e8; z-index: 999; transition: 0.2s; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
-        .btn-gps i { font-size: 24px; }
-        .btn-gps:active { transform: scale(0.9); }
-        
-        /* TURN BANNER */
-        .turn-banner { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 350px; background: rgba(11,96,80,0.76); color: white; border-radius: 17px; padding: 15px 20px; z-index: 1001; box-shadow: 0 10px 28px rgba(0,0,0,0.24); display: none; align-items: center; opacity: 0; transition: 0.3s; backdrop-filter: blur(18px) saturate(135%); -webkit-backdrop-filter: blur(18px) saturate(135%); border: 1px solid rgba(255,255,255,0.20); }
-        .turn-banner i { font-size: 35px; margin-right: 18px; }
-        .turn-text { font-size: 20px; font-weight: 900; }
-
-        /* MODALS */
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); z-index: 2000; display: none; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
-        .modal-box { background: rgba(255,255,255,0.78); padding: 25px; border-radius: 22px; width: 90%; max-width: 340px; box-shadow: 0 18px 46px rgba(0,0,0,0.28); backdrop-filter: blur(22px) saturate(145%); -webkit-backdrop-filter: blur(22px) saturate(145%); border: 1px solid rgba(255,255,255,0.60); }
-        .modal-title { font-size: 18px; font-weight: 900; color: #1a73e8; margin-bottom: 18px; display: flex; align-items: center; gap: 10px; }
-        .modal-input-group { margin-bottom: 18px; }
-        .modal-input-group label { display: block; font-size: 13px; font-weight: 800; color: #444; margin-bottom: 8px; }
-        .modal-input-group input { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 10px; font-size: 15px; font-weight: bold; outline: none; transition: 0.2s; background: white; }
-        .modal-input-group input:focus { border-color: #1a73e8; }
-        .modal-btn { background: #1a73e8; color: white; border: none; padding: 12px; border-radius: 10px; width: 100%; font-size: 15px; font-weight: 900; cursor: pointer; box-shadow: 0 4px 12px rgba(26,115,232,0.3); }
-        .modal-btn.close { background: #f1f3f4; color: #333; margin-top: 12px; box-shadow: none; }
-        .analysis-text { font-size: 15px; line-height: 1.6; font-weight: bold; color: #333; margin-bottom: 18px; }
-        .analysis-text.warning { color: #ea4335; }
-
-        .toast { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.85); color: white; padding: 15px 30px; border-radius: 30px; z-index: 2000; font-size: 15px; font-weight: bold; display: none; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-        
-        .direction-marker { transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1); transform-origin: center center; }
-
-        /* CUSTOM MAP MARKERS FOR STOPS */
-        .marker-wrapper { position: relative; display: flex; flex-direction: column; align-items: center; cursor: grab; pointer-events: auto; }
-        .marker-wrapper:active { cursor: grabbing; transform: scale(1.05); }
-        .stop-marker { padding: 6px 14px; border-radius: 20px; font-weight: 900; font-size: 13px; border: 3px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.5); white-space: nowrap; transform: translateY(-10px); }
-        .stop-intermediate { background-color: #fbbc04; color: #111; }
-        .stop-final { background-color: #ea4335; color: white; }
-        .drag-hint { font-size: 10px; color: #fff; background: rgba(0,0,0,0.8); padding: 3px 8px; border-radius: 10px; font-weight: bold; white-space: nowrap; transform: translateY(-5px); box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
-
-        .setting-toggle { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 0; margin-top:4px; border-top:1px solid rgba(80,80,80,0.12); }
-        .setting-toggle label { font-size:13px; font-weight:800; color:#333; line-height:1.25; }
-        .switch { position:relative; display:inline-block; width:48px; height:28px; flex:0 0 auto; }
-        .switch input { opacity:0; width:0; height:0; }
-        .slider { position:absolute; cursor:pointer; inset:0; background:rgba(90,90,90,0.28); transition:.25s; border-radius:30px; }
-        .slider:before { content:""; position:absolute; height:22px; width:22px; left:3px; top:3px; background:white; transition:.25s; border-radius:50%; box-shadow:0 2px 7px rgba(0,0,0,.22); }
-        .switch input:checked + .slider { background:#1a73e8; }
-        .switch input:checked + .slider:before { transform:translateX(20px); }
-        .leaflet-control-attribution { background:rgba(255,255,255,.55) !important; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); font-size:9px !important; }
-        .leaflet-control-attribution a { color:#345 !important; }
-
-        /* LANDSCAPE FIX */
-        @media (orientation: landscape) {
-            .search-panel { top: 15px; left: 15px; transform: none; width: 340px; max-height: 85vh; }
-            .search-panel.hidden { transform: translateY(-150%); }
-            .ebike-dash { bottom: 15px; right: 15px; top: auto; left: auto; }
-            .bottom-panel { width: 340px; left: 15px; right: auto; bottom: 15px; border-radius: 15px; padding: 15px; }
-            .btn-gps { right: 15px; bottom: 15px; left: auto; }
-            .turn-banner { top: 15px; left: 50%; transform: translateX(-50%); }
-        }
-
-
-        .route-policy {
-            display:inline-flex; align-items:center; gap:6px; margin-top:6px; width:max-content;
-            padding:5px 9px; border-radius:999px; font-size:9px; font-weight:800; letter-spacing:.7px;
-            color:#dfffea; background:rgba(25,135,84,.18); border:1px solid rgba(99,211,145,.34);
-        }
-        .route-policy::before { content:""; width:6px; height:6px; border-radius:50%; background:#63d391; box-shadow:0 0 10px rgba(99,211,145,.75); }
-
-        /* === V3 TESLA / PERFORMANCE UI === */
-        :root {
-            --glass: rgba(12, 14, 18, 0.78);
-            --glass-strong: rgba(9, 11, 14, 0.88);
-            --glass-soft: rgba(22, 25, 30, 0.72);
-            --line: rgba(255,255,255,0.13);
-            --text: #f5f7fa;
-            --muted: rgba(238,242,247,0.62);
-            --accent: #3ea6ff;
-            --green: #63d391;
-            --danger: #ff625f;
-        }
-
-        body { background:#0b0d10; color:var(--text); }
-        #map-wrapper { background:#d9dde0; }
-        #map {
-            top:0 !important;
-            left:0 !important;
-            width:100vw !important;
-            height:100vh !important;
-            transform:none !important;
-            transition:none !important;
-            will-change:auto;
-        }
-        .leaflet-tile { image-rendering:auto; }
-
-        /* Keep blur modest: still glassy without hammering mobile GPUs. */
-        .search-panel,
-        .ebike-dash,
-        .bottom-panel,
-        .btn-gps,
-        .turn-banner,
-        .modal-box,
-        .suggestions {
-            background:var(--glass) !important;
-            border:1px solid var(--line) !important;
-            box-shadow:0 14px 34px rgba(0,0,0,.24) !important;
-            backdrop-filter:blur(8px) saturate(115%) !important;
-            -webkit-backdrop-filter:blur(8px) saturate(115%) !important;
-        }
-
-        .search-panel { max-width:430px; border-radius:20px; padding:10px 13px; }
-        .input-row { border-color:rgba(255,255,255,.09); }
-        .input-row input { color:var(--text) !important; font-weight:600; }
-        .input-row input::placeholder { color:rgba(255,255,255,.48); }
-        .input-row i.loc-icon { color:var(--accent) !important; }
-        .btn-add-stop { color:#cfeaff; font-weight:700; }
-        .btn-find-route,
-        .btn-start,
-        .modal-btn { background:#f4f6f8 !important; color:#111317 !important; box-shadow:none !important; font-weight:800; }
-        .btn-stop { background:rgba(255,78,75,.92) !important; color:#fff !important; }
-        .suggestion-item { color:var(--text); border-color:rgba(255,255,255,.08); }
-        .suggestion-item:active { background:rgba(255,255,255,.09); }
-        .search-loading { color:var(--muted); }
-
-        .ebike-dash {
-            width:210px;
-            bottom:132px;
-            right:12px;
-            border-radius:22px;
-            padding:14px;
-            color:var(--text);
-            overflow:hidden;
-            contain:layout paint;
-        }
-        .dash-header { margin:0 0 10px; }
-        .dash-kicker { font-size:9px; letter-spacing:1.6px; font-weight:700; color:var(--muted); }
-        .dash-title { color:var(--text); font-size:20px; line-height:1; text-transform:none; letter-spacing:-.4px; margin:3px 0 0; font-weight:650; }
-        .dash-controls { gap:7px; }
-        .info-btn {
-            width:29px; height:29px;
-            background:rgba(255,255,255,.08) !important;
-            color:#fff;
-            border:1px solid rgba(255,255,255,.09);
-            box-shadow:none;
-        }
-        .info-btn:active { background:rgba(255,255,255,.15) !important; }
-        #dash-content { transition:max-height .22s ease; max-height:520px; }
-
-        .speed-cluster {
-            display:flex; flex-direction:column; align-items:center; justify-content:center;
-            padding:6px 0 12px;
-            border-bottom:1px solid rgba(255,255,255,.09);
-        }
-        .speed-value { color:#fff !important; font-size:42px !important; font-weight:500 !important; letter-spacing:-2px; line-height:1; }
-        .speed-value span { font-size:11px !important; letter-spacing:.2px; color:var(--muted); font-weight:600; margin-left:2px; }
-        .speed-label { margin-top:6px; font-size:8px; letter-spacing:1.2px; color:var(--muted); font-weight:700; }
-
-        .tesla-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; padding:11px 0; }
-        .tesla-stat { min-width:0; text-align:center; }
-        .tesla-stat .stat-label { display:block; font-size:8px; letter-spacing:.7px; color:var(--muted); font-weight:700; margin-bottom:4px; }
-        .tesla-stat strong { display:block; color:#fff; font-size:15px; font-weight:650; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .tesla-stat small { display:block; margin-top:2px; color:rgba(255,255,255,.42); font-size:8px; }
-        .tesla-stat .dash-val.red { color:var(--danger); }
-
-        .tesla-config { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-top:1px; }
-        .tesla-config label {
-            display:flex; flex-direction:column; gap:4px; padding:7px 8px;
-            border-radius:11px; background:rgba(255,255,255,.055);
-            color:var(--muted); font-size:8px; letter-spacing:.4px; font-weight:700;
-        }
-        .tesla-config label span { display:flex; align-items:center; gap:2px; color:#fff; font-size:10px; letter-spacing:0; }
-        .tesla-config input {
-            width:45px; padding:0; border:0; outline:0; background:transparent;
-            color:#fff; font-size:14px; font-weight:650; text-align:left;
-        }
-
-        .dash-actions { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-top:9px; }
-        .tesla-action {
-            border:1px solid rgba(255,255,255,.08); background:rgba(255,255,255,.075); color:#fff;
-            border-radius:12px; min-height:39px; display:flex; align-items:center; justify-content:center; gap:6px;
-            font-size:10px; font-weight:700; cursor:pointer;
-        }
-        .tesla-action i { font-size:16px; }
-        .tesla-action.danger { color:#ff8b88; }
-        .tesla-action:active { background:rgba(255,255,255,.14); transform:scale(.98); }
-
-        .bottom-panel {
-            width:calc(100% - 20px); left:10px; bottom:10px;
-            border-radius:20px; padding:12px 14px 13px;
-            background:var(--glass-strong) !important;
-        }
-        .route-title { color:#fff; font-size:18px; font-weight:650; letter-spacing:-.2px; }
-        .route-desc { color:var(--muted); font-size:11px; font-weight:500; margin-top:2px; }
-        .btn-start { min-height:45px; padding:10px 14px; border-radius:14px; font-size:14px; }
-
-        .btn-gps { bottom:138px; left:12px; width:44px; height:44px; color:#fff; border-radius:14px; background:var(--glass-strong) !important; }
-        .turn-banner { background:rgba(10,13,16,.88) !important; border-radius:18px; padding:13px 16px; }
-        .turn-banner i { color:var(--accent); }
-        .turn-text { font-size:18px; font-weight:650; }
-
-        .modal-overlay { background:rgba(0,0,0,.48); backdrop-filter:none; -webkit-backdrop-filter:none; }
-        .modal-box { background:rgba(13,15,19,.94) !important; color:#fff; }
-        .modal-title { color:#fff; font-weight:650; }
-        .modal-input-group label, .setting-toggle label { color:var(--muted); }
-        .modal-input-group input { background:rgba(255,255,255,.07); color:#fff; border:1px solid rgba(255,255,255,.12); }
-        .modal-box p { color:rgba(255,255,255,.58) !important; }
-        .slider { background:rgba(255,255,255,.14); }
-        .switch input:checked + .slider { background:#fff; }
-        .switch input:checked + .slider:before { background:#111; }
-
-        .toast { background:rgba(9,11,14,.91); border:1px solid rgba(255,255,255,.12); box-shadow:0 12px 28px rgba(0,0,0,.25); }
-        .stop-marker { border-width:2px; box-shadow:0 4px 10px rgba(0,0,0,.25); }
-        .drag-hint { display:none; }
-        .direction-marker { transition:transform .18s linear; }
-        .leaflet-control-attribution { background:rgba(10,12,15,.68) !important; color:rgba(255,255,255,.62) !important; backdrop-filter:none !important; -webkit-backdrop-filter:none !important; }
-        .leaflet-control-attribution a { color:#d8eaff !important; }
-
-        @media (max-width:420px) {
-            .ebike-dash { width:190px; padding:12px; }
-            .speed-value { font-size:36px !important; }
-            .tesla-stat strong { font-size:14px; }
-        }
-        @media (orientation:landscape) {
-            .search-panel { background:var(--glass) !important; }
-            .ebike-dash { right:12px; bottom:12px; }
-            .bottom-panel { width:330px; left:12px; bottom:12px; border-radius:20px; }
-            .btn-gps { right:232px; left:auto; bottom:12px; }
-        }
-
-
-        /* === V4 TESLA-INSPIRED IMMERSIVE NAVIGATION === */
-        .tesla-nav-hud { display:none; position:fixed; inset:0; z-index:1003; pointer-events:none; color:#fff; }
-        body.route-nav-active .tesla-nav-hud { display:block; }
-        body.route-nav-active .turn-banner { display:none !important; }
-        body.route-nav-active .bottom-panel { transform:translateY(125%) !important; opacity:0; pointer-events:none; }
-        body.route-nav-active .ebike-dash {
-            width:auto !important; min-width:118px; right:12px; bottom:86px; padding:9px 11px !important;
-            border-radius:17px !important; background:rgba(8,10,13,.78) !important;
-        }
-        body.route-nav-active .ebike-dash .dash-header,
-        body.route-nav-active .ebike-dash .tesla-config,
-        body.route-nav-active .ebike-dash .dash-actions,
-        body.route-nav-active .ebike-dash .speed-label,
-        body.route-nav-active .ebike-dash .tesla-stat:first-child,
-        body.route-nav-active .ebike-dash .tesla-stat:nth-child(3) { display:none !important; }
-        body.route-nav-active .ebike-dash #dash-content { max-height:none !important; overflow:visible; }
-        body.route-nav-active .ebike-dash .speed-cluster { border:0; padding:0; }
-        body.route-nav-active .ebike-dash .speed-value { font-size:30px !important; letter-spacing:-1px; }
-        body.route-nav-active .ebike-dash .tesla-stats { display:block; padding:2px 0 0; }
-        body.route-nav-active .ebike-dash .tesla-stat:nth-child(2) strong { font-size:12px; color:rgba(255,255,255,.72); }
-        body.route-nav-active .ebike-dash .tesla-stat:nth-child(2) .stat-label,
-        body.route-nav-active .ebike-dash .tesla-stat:nth-child(2) small { display:none; }
-        body.route-nav-active .btn-gps { bottom:86px; }
-
-        .tesla-turn-card {
-            position:absolute; left:12px; top:max(12px, env(safe-area-inset-top)); width:min(410px, calc(100vw - 24px));
-            display:grid; grid-template-columns:68px 1fr; gap:13px; align-items:center;
-            padding:13px 15px 14px; border-radius:21px;
-            background:rgba(9,11,14,.89); border:1px solid rgba(255,255,255,.12);
-            box-shadow:0 14px 35px rgba(0,0,0,.24); pointer-events:auto;
-        }
-        .tesla-turn-icon-wrap { width:62px; height:62px; border-radius:18px; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.07); }
-        .tesla-turn-icon-wrap i { font-size:42px; color:#fff; }
-        .tesla-turn-distance { font-size:13px; color:#72baff; font-weight:750; letter-spacing:.25px; margin-bottom:2px; }
-        .tesla-turn-action { font-size:21px; line-height:1.05; font-weight:650; letter-spacing:-.45px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .tesla-turn-road { margin-top:5px; font-size:12px; color:rgba(255,255,255,.56); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-
-        .tesla-trip-strip {
-            position:absolute; left:10px; right:10px; bottom:10px; min-height:66px; border-radius:20px;
-            display:grid; grid-template-columns:1.15fr 1fr 1fr auto; align-items:center; gap:8px;
-            padding:9px 10px 9px 14px; background:rgba(8,10,13,.91); border:1px solid rgba(255,255,255,.12);
-            box-shadow:0 14px 35px rgba(0,0,0,.24); pointer-events:auto;
-        }
-        .tesla-trip-item { min-width:0; }
-        .tesla-trip-item strong { display:block; font-size:16px; font-weight:650; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .tesla-trip-item span { display:block; margin-top:3px; font-size:9px; letter-spacing:.65px; text-transform:uppercase; color:rgba(255,255,255,.43); font-weight:700; }
-        .tesla-nav-actions { display:flex; gap:7px; }
-        .tesla-nav-btn {
-            width:43px; height:43px; border:0; border-radius:13px; display:flex; align-items:center; justify-content:center;
-            color:#fff; background:rgba(255,255,255,.09); cursor:pointer; border:1px solid rgba(255,255,255,.08);
-        }
-        .tesla-nav-btn i { font-size:21px; }
-        .tesla-nav-btn.stop { background:rgba(255,78,75,.90); }
-        .tesla-nav-btn:active { transform:scale(.96); }
-
-        .tesla-route-chip {
-            position:absolute; top:112px; left:12px; padding:7px 10px; border-radius:12px;
-            background:rgba(8,10,13,.78); border:1px solid rgba(255,255,255,.10);
-            color:rgba(255,255,255,.70); font-size:10px; font-weight:650; pointer-events:none;
-        }
-        .tesla-route-chip b { color:#fff; font-weight:700; }
-
-        @media (max-width:520px) {
-            body.route-nav-active .ebike-dash { bottom:86px; right:10px; min-width:104px; }
-            body.route-nav-active .ebike-dash .speed-value { font-size:27px !important; }
-            .tesla-turn-card { grid-template-columns:58px 1fr; gap:10px; padding:11px 12px; }
-            .tesla-turn-icon-wrap { width:54px; height:54px; border-radius:16px; }
-            .tesla-turn-icon-wrap i { font-size:36px; }
-            .tesla-turn-action { font-size:18px; }
-            .tesla-trip-strip { grid-template-columns:1.1fr .9fr .85fr auto; padding-left:12px; }
-            .tesla-trip-item strong { font-size:14px; }
-            .tesla-nav-btn { width:40px; height:40px; }
-        }
-
-        @media (orientation:landscape) {
-            .tesla-turn-card { width:360px; }
-            .tesla-trip-strip { left:12px; right:auto; width:470px; }
-            body.route-nav-active .ebike-dash { right:12px; bottom:12px; }
-            body.route-nav-active .btn-gps { right:140px; left:auto; bottom:12px; }
-        }
-
-
-
-        /* GOOGLE-MAPS-LIKE ROUTE CHOOSER */
-        .route-choice-panel {
-            display:none; gap:8px; overflow-x:auto; padding:2px 1px 4px;
-            scrollbar-width:none; -webkit-overflow-scrolling:touch;
-        }
-        .route-choice-panel::-webkit-scrollbar { display:none; }
-        .route-choice-card {
-            flex:0 0 min(250px, 78vw); text-align:left; border:1px solid rgba(255,255,255,.16);
-            border-radius:15px; padding:10px 11px; cursor:pointer;
-            background:rgba(12,16,21,.72); color:#fff; box-shadow:0 7px 18px rgba(0,0,0,.12);
-            transition:transform .14s ease, border-color .14s ease, background .14s ease;
-        }
-        .route-choice-card:active { transform:scale(.985); }
-        .route-choice-card.selected { border-color:#4da3ff; background:rgba(19,45,73,.86); box-shadow:0 0 0 1px rgba(77,163,255,.22); }
-        .route-choice-top { display:flex; justify-content:space-between; align-items:flex-start; gap:9px; }
-        .route-choice-title { font-size:12px; font-weight:850; letter-spacing:.25px; color:#fff; }
-        .route-choice-eta { font-size:18px; font-weight:800; line-height:1; color:#72baff; white-space:nowrap; }
-        .route-choice-meta { margin-top:5px; font-size:11px; color:rgba(255,255,255,.68); font-weight:650; }
-        .route-choice-roads { margin-top:5px; font-size:10px; color:rgba(255,255,255,.48); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .route-choice-badge { display:inline-flex; align-items:center; gap:4px; margin-top:7px; padding:4px 7px; border-radius:999px; font-size:9px; font-weight:850; letter-spacing:.45px; background:rgba(100,215,145,.12); color:#7be2a6; border:1px solid rgba(123,226,166,.18); }
-        .route-choice-badge.local { background:rgba(79,162,255,.12); color:#7fbdff; border-color:rgba(127,189,255,.20); }
-        .route-choice-note { display:none; margin-top:1px; font-size:9px; line-height:1.3; color:rgba(30,35,42,.58); font-weight:650; }
-        @media (prefers-color-scheme: dark) { .route-choice-note { color:rgba(255,255,255,.45); } }
-        body.route-nav-active .route-choice-panel, body.free-nav-active .route-choice-panel { display:none !important; }
-
-
-        /* V5.4 Google Maps handoff: no API key required, lightweight control */
-        .google-route-actions { display:flex; gap:8px; margin-top:9px; align-items:stretch; }
-        .btn-google-route { flex:1 1 auto; border:1px solid rgba(79,163,255,.45); background:rgba(28,91,164,.88); color:#fff; border-radius:13px; padding:11px 9px; font-size:12px; font-weight:800; letter-spacing:.1px; cursor:pointer; display:flex; gap:6px; align-items:center; justify-content:center; }
-        .btn-google-route i { font-size:19px; }
-        .btn-google-route:active { transform:scale(.98); }
-        .btn-local-route { flex:0 1 auto; min-width:102px; border:1px solid rgba(255,255,255,.14); background:rgba(17,22,28,.78); color:#fff; border-radius:13px; padding:10px 12px; font-size:11px; font-weight:700; cursor:pointer; }
-        .google-route-hint { margin:7px 0 0; color:rgba(255,255,255,.64); font-size:10px; line-height:1.4; }
-        body.route-nav-active .google-route-actions, body.free-nav-active .google-route-actions, body.route-nav-active #google-bottom-link, body.free-nav-active #google-bottom-link {display:none !important;}
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101721">
+  <meta name="description" content="Tesla-inspired local-road navigation with OpenStreetMap bicycle navigation with road-first routing.">
+  <title>e-Moto NAV • Free Bike Lane / Wide Roads</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Material+Symbols+Rounded:FILL@0..1&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#0c131b;--glass:rgba(12,19,28,.76);--line:rgba(255,255,255,.13);--muted:#a7b7c9;--blue:#4ba6ff;--white:#f8fbff;--safe:#4de0a4;--warn:#ffbe63;--shadow:0 16px 50px rgba(0,0,0,.35)}
+    *{box-sizing:border-box}html,body{height:100%;width:100%;margin:0;overflow:hidden;font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;color:var(--white);background:#e8eef4;-webkit-tap-highlight-color:transparent}
+    button,input{font:inherit}button{border:0;cursor:pointer;touch-action:manipulation}input{min-width:0}button:disabled{opacity:.45;cursor:not-allowed}
+    .mi{font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;display:inline-block;line-height:1;white-space:nowrap;letter-spacing:normal;font-size:23px;font-feature-settings:'liga';-webkit-font-smoothing:antialiased}
+    #free-map{position:absolute;inset:0;z-index:1;background:#e4ebf2}
+    .ui{position:fixed;inset:0;pointer-events:none;z-index:9;overflow:hidden}
+    .ui>*{pointer-events:auto}.glass{background:var(--glass);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:21px;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
+    .appmark{position:absolute;left:15px;top:calc(13px + env(safe-area-inset-top));padding:8px 12px 8px 10px;display:flex;align-items:center;gap:9px;font-size:12px;font-weight:800;letter-spacing:.4px}
+    .appmark i{color:#65b6ff;font-size:23px}.appmark em{font-size:9px;font-style:normal;color:var(--muted);display:block;letter-spacing:1.6px;margin-top:2px}
+    .top-actions{position:absolute;right:14px;top:calc(13px + env(safe-area-inset-top));display:flex;gap:7px}
+    .round{width:44px;height:44px;border-radius:14px;color:#fff;background:var(--glass);box-shadow:0 8px 24px #0002;border:1px solid var(--line);display:grid;place-items:center}
+    .planning{position:absolute;top:calc(79px + env(safe-area-inset-top));left:14px;width:min(370px,calc(100vw - 28px));padding:15px}
+    .field-label{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;font-weight:800;color:#8fa9c1;margin-bottom:7px}
+    .search-row{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.075);border:1px solid #ffffff1b;border-radius:13px;padding:5px 5px 5px 12px;margin-bottom:11px}
+    .search-row .mi{font-size:20px;color:#71b4fb}.search-row input{flex:1;background:transparent;border:0;outline:0;color:white;font-size:13px;height:35px}.search-row input::placeholder{color:#9aafc5}
+    .small-icon{width:33px;height:33px;background:#ffffff12;color:#deeaf8;border-radius:9px;display:grid;place-items:center}.small-icon .mi{font-size:19px}
+    .action-line{display:flex;gap:8px}.primary{background:#277ae9;color:white;font-size:12px;font-weight:900;border-radius:13px;padding:12px 14px;flex:1}.ghost{background:rgba(255,255,255,.1);border:1px solid #ffffff20;color:white;border-radius:12px;font-size:12px;font-weight:700;padding:10px 13px}
+    .safety-note{font-size:10px;line-height:1.48;color:#b6c8d9;margin-top:10px}.safety-note b{color:#f8bd6b}
+    .route-options{position:absolute;left:14px;top:calc(331px + env(safe-area-inset-top));width:min(370px,calc(100vw - 28px));max-height:min(28vh,230px);overflow-y:auto;display:none;gap:7px;flex-direction:column;scrollbar-width:thin}
+    .route-option{padding:13px 14px;border-radius:16px;text-align:left;background:rgba(12,19,28,.86);color:white;box-shadow:0 6px 20px #0002;border:1px solid #ffffff30;display:flex;align-items:center;gap:11px;width:100%}
+    .route-option.selected{border-color:#70b8ff;background:rgba(21,47,76,.93)}.option-main{flex:1;min-width:0}.option-title{font-size:12px;font-weight:800;margin-bottom:4px}.option-sub{font-size:10px;color:#c1d0dd;line-height:1.4}.option-eta{font-size:17px;font-weight:900;color:#8ac6ff;white-space:nowrap}
+    .dashboard{position:absolute;bottom:calc(108px + env(safe-area-inset-bottom));right:14px;width:188px;padding:14px 15px 13px}
+    .dash-title{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:800;letter-spacing:1.1px;color:#b9cadb}
+    .speed{text-align:center;font-size:63px;font-weight:800;letter-spacing:-5px;line-height:1.1;padding-top:8px;font-variant-numeric:tabular-nums}
+    .speed-unit{text-align:center;color:#9db3c7;font-size:11px;font-weight:700;letter-spacing:2px;margin-bottom:11px}
+    .dash-cells{display:grid;grid-template-columns:1fr 1fr;gap:7px}.dash-cell{background:rgba(255,255,255,.07);padding:9px 7px;border-radius:10px}.dash-cell span{display:block;color:#a5bbcf;font-size:9px;font-weight:800;letter-spacing:.3px}.dash-cell strong{display:block;margin-top:3px;font-size:15px;font-weight:800;font-variant-numeric:tabular-nums}
+    .bottom{position:absolute;bottom:calc(13px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;border-radius:20px;padding:11px;width:min(530px,calc(100vw - 28px))}
+    .trip-summary{min-width:0;flex:1;padding-left:5px}.trip-summary b{display:block;font-size:16px;line-height:1.35}.trip-summary span{display:block;font-size:10px;color:#abc1d7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:4px}
+    .start{border-radius:12px;background:#277ae9;color:#fff;font-size:12px;font-weight:900;padding:13px 15px;white-space:nowrap}
+    .recenter{position:absolute;bottom:calc(310px + env(safe-area-inset-bottom));right:14px}.status{position:absolute;top:calc(78px + env(safe-area-inset-top));right:14px;max-width:190px;padding:8px 10px;border-radius:10px;font-size:10px;font-weight:800;background:rgba(17,23,34,.8);border:1px solid #fff2;color:#f4c787;text-align:center}
+    .nav-header{display:none;position:absolute;top:calc(13px + env(safe-area-inset-top));left:14px;width:min(420px,calc(100vw - 28px));padding:17px}
+    .next-label{text-transform:uppercase;color:#9eb9d1;font-size:10px;font-weight:900;letter-spacing:1.7px}.next-turn{display:flex;align-items:center;gap:13px;margin-top:5px}.next-turn .mi{font-size:41px;color:#8ac6ff}.turn-main{font-size:23px;line-height:1.1;font-weight:800;max-width:285px}.turn-minor{font-size:11px;color:#b6cadd;margin-top:7px}
+    .nav-footer{display:none;position:absolute;bottom:calc(13px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:min(570px,calc(100vw - 26px));padding:14px 15px;align-items:center;gap:12px}
+    .nav-metric{flex:1}.nav-metric b{font-size:20px;display:block;font-weight:900}.nav-metric span{display:block;font-size:9px;color:#9eb9d1;font-weight:700;letter-spacing:.7px;margin-top:3px}.nav-footer .round{flex-shrink:0;background:#ffffff18}
+    body.riding .planning,body.riding .route-options,body.riding .bottom,body.riding .appmark{display:none!important}
+    body.riding .nav-header,body.riding .nav-footer{display:flex}
+    body.riding .dashboard{bottom:calc(105px + env(safe-area-inset-bottom));width:155px;padding:10px}
+    body.riding .speed{font-size:44px;letter-spacing:-3px}body.riding .dashboard .dash-title,body.riding .dashboard .speed-unit{display:none}body.riding .dash-cell{padding:7px 5px}body.riding .dash-cell strong{font-size:12px}
+    body.riding .recenter{bottom:calc(265px + env(safe-area-inset-bottom))}body.riding .status{display:none}
+    .toast{position:fixed;z-index:30;top:48%;left:50%;transform:translate(-50%,-50%);padding:13px 17px;border-radius:13px;color:#fff;background:#172231e9;box-shadow:var(--shadow);max-width:min(360px,90vw);text-align:center;font-size:12px;line-height:1.55;font-weight:700;display:none;pointer-events:none}
+    .scrim{position:fixed;inset:0;z-index:50;background:#080c13be;display:grid;place-items:center;padding:15px}.setup{width:min(490px,100%);background:#111b28;border:1px solid #ffffff24;border-radius:25px;box-shadow:0 25px 60px #0009;padding:25px;color:white;max-height:94vh;overflow-y:auto}.setup-icon{width:47px;height:47px;border-radius:14px;background:#16395a;display:grid;place-items:center;color:#8bc9ff}.setup h1{font-size:23px;line-height:1.25;margin:17px 0 9px}.setup p{color:#b5c7d8;line-height:1.6;font-size:12px;margin:0 0 14px}.setup label{display:block;color:#d4e3f2;font-size:11px;font-weight:800;margin:15px 0 7px}.setup input{width:100%;background:#0b121c;border:1px solid #41546a;border-radius:12px;color:white;font:600 13px Inter,sans-serif;padding:13px}.setup .primary{width:100%;padding:14px;margin-top:12px}.setup a{color:#95caff}.disclaimer{font-size:11px;line-height:1.65;border-left:3px solid #ffbd62;padding:10px 13px;background:#ffffff09;border-radius:5px;color:#d8e3ee}.error-note{color:#ffb7ac;font-size:11px;min-height:14px;margin-top:7px}
+    .sheet{display:none;position:fixed;z-index:40;inset:0;background:#070c13a4;align-items:center;justify-content:center;padding:16px}.sheet.open{display:flex}.sheet-panel{width:min(430px,100%);padding:20px;background:#142030;border:1px solid #ffffff20;border-radius:22px;box-shadow:var(--shadow)}.sheet-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:15px;font-weight:900}.setting{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;font-size:12px;border-bottom:1px solid #ffffff13}.setting input{width:75px;border:1px solid #ffffff35;border-radius:9px;background:#090f18;color:white;padding:10px;font-size:12px}.setting small{display:block;color:#aac1d7;margin-top:3px}.setting select{color:white;background:#090f18;border:1px solid #ffffff35;padding:10px;border-radius:8px}
+    @media(max-width:640px){.planning{top:calc(69px + env(safe-area-inset-top));padding:12px}.route-options{top:calc(310px + env(safe-area-inset-top));max-height:24vh}.dashboard{width:158px;bottom:calc(106px + env(safe-area-inset-bottom));right:10px;padding:12px}.speed{font-size:52px}.dash-cell strong{font-size:12px}.recenter{bottom:calc(291px + env(safe-area-inset-bottom))}.status{top:calc(65px + env(safe-area-inset-top));right:10px;max-width:135px}.nav-header{padding:14px}.turn-main{font-size:20px}.nav-footer{padding:12px;gap:8px}.nav-metric b{font-size:17px}}
+    @media(max-height:620px) and (orientation:landscape){.planning{top:70px;max-width:340px}.route-options{left:365px;top:70px;max-height:45vh}.dashboard{right:12px;bottom:15px}.bottom{max-width:360px;left:15px;transform:none;bottom:15px}.nav-footer{left:15px;transform:none;max-width:430px;bottom:13px}.nav-header{max-width:380px}.recenter{right:180px;bottom:20px}.status{top:18px;right:120px}}
+    .place-results{position:absolute;top:calc(245px + env(safe-area-inset-top));left:14px;width:min(370px,calc(100vw - 28px));display:none;padding:5px;z-index:12;max-height:38vh;overflow:auto}
+  .place-result{width:100%;text-align:left;color:white;background:transparent;border-bottom:1px solid #ffffff24;padding:12px 10px;font-size:12px;line-height:1.3}
+  .place-result:last-child{border:0}.place-result:active{background:#ffffff22}
+  .gps-arrow{width:42px;height:42px;border:3px solid #fff;border-radius:50%;box-shadow:0 3px 12px #0007;background:#1664db;display:grid;place-items:center;color:#fff;transition:transform .45s linear}.gps-arrow .mi{font-size:25px}
+  .leaflet-container{background:#e4ebf2}.leaflet-control-attribution{font-size:9px!important}
+  body.riding .place-results{display:none!important}
+  @media (max-width:640px){.place-results{top:calc(235px + env(safe-area-inset-top))}}
+</style>
 </head>
 <body>
-
-    <div class="toast" id="toast">Kumukuha ng GPS...</div>
-    
-    <div id="map-wrapper">
-        <div id="map"></div>
-    </div>
-
-    <div class="suggestions" id="suggestions-box"></div>
-
-    <!-- SEARCH PANEL MULTI-STOP WITH LEG-BY-LEG UI -->
-    <div class="search-panel" id="search-panel">
-        <div class="stops-wrapper" id="stops-wrapper">
-            <div class="input-row">
-                <i class="material-icons loc-icon" style="color: #1a73e8;">my_location</i>
-                <input type="text" value="From: Your Location" readonly style="color: #1a73e8; font-weight: 900;">
-            </div>
-            
-            <div id="stops-container">
-                <div class="input-row stop-row" style="position: relative;">
-                    <i class="material-icons loc-icon" style="color: #ea4335;">location_on</i>
-                    <input type="text" class="dest-input" placeholder="To: 1st Destination" oninput="handleSearchInput(this)" onfocus="activateSearchMode(this)" onblur="deactivateSearchMode()" autocomplete="off">
-                </div>
-            </div>
-        </div>
-        
-        <div class="action-row">
-            <button class="btn-add-stop" onclick="addStopInput()"><i class="material-icons" style="font-size:18px;">add_circle</i> ADD STOP</button>
-            <span style="font-size:11px;font-weight:750;opacity:.75">ROUTE OPTIONS</span>
-        </div>
-        <div class="google-route-actions">
-            <button class="btn-google-route" onclick="openGoogleMapsRoute()"><i class="material-icons">map</i> GOOGLE MAPS ROUTES</button>
-            <button class="btn-local-route" onclick="calculateMultiStopRoute()">IN-APP (BETA)</button>
-        </div>
-        <p class="google-route-hint">Google Maps opens separately with Avoid tolls + highways requested. Review the route and signs before riding; avoidance is not guaranteed.</p>
-    </div>
-
-    <!-- TESLA-STYLE DRIVE CARD -->
-    <div class="ebike-dash" id="ebike-dash">
-        <div class="dash-header">
-            <div>
-                <div class="dash-kicker">E-MOTORCYCLE</div>
-                <h3 class="dash-title">Drive</h3>
-            </div>
-            <div class="dash-controls">
-                <button class="info-btn" aria-label="Collapse dashboard" onclick="toggleDashboard()"><i class="material-icons" id="toggle-dash-icon">expand_less</i></button>
-                <button class="info-btn" aria-label="Settings" onclick="openSettingsPlanner()"><i class="material-icons">tune</i></button>
-            </div>
-        </div>
-        
-        <div id="dash-content">
-            <div class="speed-cluster">
-                <span class="speed-value" id="disp-speed">0 <span>km/h</span></span>
-                <span class="speed-label">CURRENT SPEED</span>
-            </div>
-
-            <div class="tesla-stats">
-                <div class="tesla-stat"><span class="stat-label">TRIP</span><strong id="disp-trip">0.00</strong><small>km</small></div>
-                <div class="tesla-stat"><span class="stat-label">BATTERY</span><strong class="dash-val" id="disp-bat">100%</strong><small>live</small></div>
-                <div class="tesla-stat"><span class="stat-label">RANGE</span><strong id="disp-range">30.0</strong><small>km est.</small></div>
-            </div>
-
-            <div class="tesla-config">
-                <label>START BAT <span><input type="number" id="battery-input" value="100" max="100" min="0" onchange="manualDataUpdate()">%</span></label>
-                <label>MAX RANGE <span><input type="number" id="max-range-input" value="30" min="1" onchange="manualDataUpdate()">km</span></label>
-            </div>
-
-            <div class="dash-actions">
-                <button class="tesla-action danger" onclick="resetTripMeter()"><i class="material-icons">restart_alt</i><span>Reset</span></button>
-                <button class="tesla-action" onclick="runManualAnalysis()"><i class="material-icons">volume_up</i><span>Range</span></button>
-            </div>
-        </div>
-    </div>
-
-    <button class="btn-gps" onclick="forceAccurateLocation()"><i class="material-icons">gps_fixed</i></button>
-
-    <!-- BOTTOM PANEL -->
-    <div class="bottom-panel" id="bottom-panel">
-        <div>
-            <div class="route-title" id="route-eta">Free Ride Mode</div>
-            <div class="route-desc" id="route-dist">GPS Tracking & Trip Meter</div>
-            <div class="route-policy" id="route-policy">NO TOLL INTENDED • VERIFY ROADS</div>
-        </div>
-        <div class="route-choice-panel" id="route-choice-panel"></div>
-        <div class="route-choice-note" id="route-choice-note">Review roads carefully before riding. Public map data may be incomplete.</div>
-        <button class="google-bottom-link" id="google-bottom-link" onclick="openGoogleMapsRoute()" style="width:100%;border:1px solid rgba(79,163,255,.30);border-radius:12px;padding:9px;background:rgba(13,37,65,.84);color:#bce0ff;font-weight:750;cursor:pointer">OPEN GOOGLE MAPS ROUTE CHOICES ↗</button>
-        <button class="btn-start" id="btn-start" onclick="toggleNav()">
-            <i class="material-icons">navigation</i> START RIDE
-        </button>
-        <button class="btn-start btn-stop" id="btn-stop" onclick="toggleNav()">
-            <i class="material-icons">close</i> EXIT RIDE
-        </button>
-    </div>
-
-    <!-- TURN BANNER -->
-    <div class="turn-banner" id="turn-banner">
-        <i class="material-icons" id="turn-icon">explore</i>
-        <div>
-            <div style="font-size:13px; font-weight:bold;">Status</div>
-            <div class="turn-text" id="turn-text">Free Ride Mode</div>
-        </div>
-    </div>
-
-
-    <!-- TESLA-INSPIRED IMMERSIVE NAV HUD -->
-    <div class="tesla-nav-hud" id="tesla-nav-hud">
-        <div class="tesla-turn-card">
-            <div class="tesla-turn-icon-wrap"><i class="material-icons" id="tesla-turn-icon">straight</i></div>
-            <div>
-                <div class="tesla-turn-distance" id="tesla-turn-distance">Follow route</div>
-                <div class="tesla-turn-action" id="tesla-turn-action">Continue</div>
-                <div class="tesla-turn-road" id="tesla-turn-road">Motorcycle navigation</div>
-            </div>
-        </div>
-        <div class="tesla-route-chip" id="tesla-route-chip">Route active</div>
-        <div class="tesla-trip-strip">
-            <div class="tesla-trip-item"><strong id="tesla-arrival">--:--</strong><span>Arrival</span></div>
-            <div class="tesla-trip-item"><strong id="tesla-remaining-time">-- min</strong><span>Remaining</span></div>
-            <div class="tesla-trip-item"><strong id="tesla-remaining-dist">-- km</strong><span>Distance</span></div>
-            <div class="tesla-nav-actions">
-                <button class="tesla-nav-btn" onclick="toggleTeslaOverview()" aria-label="Route overview"><i class="material-icons">route</i></button>
-                <button class="tesla-nav-btn stop" onclick="toggleNav()" aria-label="End navigation"><i class="material-icons">close</i></button>
-            </div>
-        </div>
-    </div>
-
-    <!-- SETTINGS & PLANNER MODAL -->
-    <div class="modal-overlay" id="planner-modal">
-        <div class="modal-box">
-            <div class="modal-title"><i class="material-icons">settings</i> Settings & Planner</div>
-
-            <div class="modal-input-group">
-                <label>Time to Full Charge (Hours)</label>
-                <input type="number" id="charge-time-input" value="6" min="1" step="0.5" onchange="saveState()">
-            </div>
-            <p style="font-size: 12px; color: #555; margin-bottom: 12px; font-weight: 500; line-height: 1.4;">Ito ang oras na kailangan para ma-full charge ang electric motorcycle mo mula 0%. Ginagamit ito para sa voice-only battery at charging guidance.</p>
-            <div class="setting-toggle">
-                <label for="auto-start-toggle">Auto-start ride kapag may movement</label>
-                <label class="switch">
-                    <input type="checkbox" id="auto-start-toggle" checked onchange="saveState()">
-                    <span class="slider"></span>
-                </label>
-            </div>
-            <p style="font-size: 11px; color: #666; margin: 0 0 18px 0; line-height: 1.35;">Kapag may ready route, route navigation ang sisimulan. Kapag wala, Free Ride ang automatic na magsisimula.</p>
-            <button class="modal-btn" onclick="closeSettingsPlanner()">SAVE SETTINGS</button>
-        </div>
-    </div>
-
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
-    <script>
-        let startBattery = parseFloat(localStorage.getItem('ebike_startBat')) || 100.0;
-        let maxRangeLimit = parseFloat(localStorage.getItem('ebike_maxRange')) || 30.0;
-        let tripDistance = parseFloat(localStorage.getItem('ebike_tripDist')) || 0.0;
-        let fullChargeHours = parseFloat(localStorage.getItem('ebike_chargeHours')) || 6.0;
-        let currentLiveBattery = startBattery;
-        let autoStartOnMove = localStorage.getItem('nav_autoStartOnMove') !== '0';
-        let pendingRideRestore = localStorage.getItem('nav_isNavigating') === '1';
-        let pendingRouteRestore = localStorage.getItem('nav_hadRoute') === '1';
-        let restoreRouteStarted = false;
-        let autoMotionConfirmations = 0;
-        let autoMotionAnchor = null;
-        let autoStartCooldownUntil = 0;
-        let lastStatePersistAt = 0;
-        let lastMapFollowAt = 0;
-        let lastRouteDeviationCheckAt = 0;
-
-        document.getElementById('battery-input').value = Math.round(startBattery);
-        document.getElementById('max-range-input').value = Math.round(maxRangeLimit);
-        document.getElementById('charge-time-input').value = fullChargeHours;
-        document.getElementById('auto-start-toggle').checked = autoStartOnMove;
-
-        function savePlannerState() {
-            try {
-                const inputs = Array.from(document.querySelectorAll('.dest-input'));
-                const stops = inputs
-                    .filter(input => input.dataset.lat && input.dataset.lng)
-                    .map(input => ({
-                        name: input.value || 'Pinned destination',
-                        lat: Number(input.dataset.lat),
-                        lng: Number(input.dataset.lng)
-                    }))
-                    .filter(stop => Number.isFinite(stop.lat) && Number.isFinite(stop.lng));
-
-                localStorage.setItem('nav_savedStops', JSON.stringify(stops));
-                localStorage.setItem('nav_isNavigating', isNavigating ? '1' : '0');
-                localStorage.setItem('nav_hadRoute', (activeWaypointsList.length > 1 || stops.length > 0) ? '1' : '0');
-                localStorage.setItem('nav_mode', activeWaypointsList.length > 1 ? 'route' : 'free');
-                localStorage.setItem('nav_waypointTargetIndex', String(currentWaypointTargetIndex || 1));
-                localStorage.setItem('nav_lastSpokenKm', String(lastSpokenKm || 0));
-                localStorage.setItem('nav_savedAt', String(Date.now()));
-            } catch (e) {}
-        }
-
-        function saveState() {
-            localStorage.setItem('ebike_startBat', startBattery);
-            localStorage.setItem('ebike_maxRange', maxRangeLimit);
-            localStorage.setItem('ebike_tripDist', tripDistance);
-
-            fullChargeHours = parseFloat(document.getElementById('charge-time-input').value) || 6.0;
-            autoStartOnMove = document.getElementById('auto-start-toggle').checked;
-            localStorage.setItem('ebike_chargeHours', fullChargeHours);
-            localStorage.setItem('nav_autoStartOnMove', autoStartOnMove ? '1' : '0');
-            savePlannerState();
-        }
-
-        function activateSearchMode(inputEl) {
-            activeSearchInput = inputEl;
-            // Focusing an already pinned destination must not invalidate its route.
-            // Route invalidation happens only when the user actually edits the field.
-            if (!inputEl.dataset.lat && !inputEl.dataset.lng && inputEl.value.trim().length >= 3) {
-                handleSearchInput(inputEl);
-            }
-        }
-        function deactivateSearchMode() {
-            setTimeout(() => {
-                const box = document.getElementById('suggestions-box');
-                // No action needed for dashboard since it's bottom right
-            }, 300);
-        }
-
-        let isDashCollapsed = false;
-        function toggleDashboard() {
-            const content = document.getElementById('dash-content');
-            const icon = document.getElementById('toggle-dash-icon');
-            if (isDashCollapsed) {
-                content.style.maxHeight = "600px";
-                icon.innerText = "expand_less";
-                isDashCollapsed = false;
-            } else {
-                content.style.maxHeight = "0px";
-                icon.innerText = "expand_more";
-                isDashCollapsed = true;
-            }
-        }
-
-        function openSettingsPlanner() { document.getElementById('planner-modal').style.display = 'flex'; }
-        function closeSettingsPlanner() { document.getElementById('planner-modal').style.display = 'none'; saveState(); }
-
-        let wakeLock = null;
-        async function requestWakeLock() {
-            try { if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); } } catch (err) {}
-        }
-        requestWakeLock();
-        document.addEventListener('visibilitychange', async () => {
-            if (document.visibilityState === 'hidden') {
-                saveState();
-            } else {
-                requestWakeLock();
-                setTimeout(() => map.invalidateSize(), 150);
-            }
-        });
-        window.addEventListener('pagehide', saveState);
-        window.addEventListener('beforeunload', saveState);
-        window.addEventListener('pageshow', () => setTimeout(() => map.invalidateSize(), 150));
-
-        // PERFORMANCE MODE: lightweight Leaflet raster map.
-        // Keeping the map north-up and rotating only the vehicle arrow is much smoother on phones.
-        const map = L.map('map', {
-            zoomControl: false,
-            zoomSnap: 0.25,
-            zoomDelta: 0.5,
-            preferCanvas: true,
-            fadeAnimation: false,
-            markerZoomAnimation: false
-        }).setView([14.5995, 121.1713], 15.25);
-
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            updateWhenIdle: true,
-            updateWhenZooming: false,
-            keepBuffer: 3,
-            attribution: '&copy; OpenStreetMap contributors'
-        }).addTo(map);
-
-        const navArrowIcon = L.divIcon({
-            html: `<svg class="direction-marker" id="nav-arrow" width="56" height="56" viewBox="0 0 100 100">
-              <path d="M50 5 L90 85 L50 65 L10 85 Z" fill="#1a73e8" stroke="#ffffff" stroke-width="6" stroke-linejoin="round" filter="drop-shadow(0px 4px 6px rgba(0,0,0,0.4))"/>
-            </svg>`,
-            className: '', iconSize: [56, 56], iconAnchor: [28, 45]
-        });
-
-        let marker = null;
-        let currentLat = null, currentLng = null;
-        let previousHeading = 0;
-        let accumulatedRotation = 0;
-        let isNavigating = false;
-        let routingControl = null;
-        
-        let activeWaypointsList = []; 
-        let activeLegDistances = []; 
-        let currentWaypointTargetIndex = 1;
-        
-        // AUTO-RECALC VARIABLES
-        let activeRouteCoords = [];
-        let isRecalculating = false;
-
-        let lastTrackedCoords = null;
-        let lastSpokenKm = 0;
-        let spokenArrivalWarning = false;
-        let activeRouteDistanceKm = 0;
-
-        // TURN-BY-TURN VOICE STATE
-        let activeInstructions = [];
-        let currentInstructionIndex = 0;
-        let announcedInstructionKey = "";
-        let lastOffRouteRecalcAt = 0;
-        let lastSpeechText = "";
-        let lastSpeechAt = 0;
-
-        // TESLA-INSPIRED NAVIGATION CAMERA / TRIP HUD
-        let currentSpeedKmh = 0;
-        let currentHeadingDeg = null;
-        let lastTeslaCameraAt = 0;
-        let lastTeslaProgressAt = 0;
-        let nextManeuverDistanceMeters = Infinity;
-        let routeTotalTimeSeconds = 0;
-        let routeRemainingMeters = 0;
-        let routeRemainingTimeSeconds = 0;
-        let routeRemainingMetersByIndex = [];
-        let overviewModeUntil = 0;
-        let lastNearestRouteIndex = 0;
-        let availableRouteChoices = [];
-        let selectedRouteChoiceIndex = 0;
-        let routeChoiceRenderToken = 0;
-        let suppressRouteChoiceAnnouncement = false;
-
-        function forceAccurateLocation() {
-            showToast("Kumukuha ng GPS Location...");
-            navigator.geolocation.getCurrentPosition(pos => {
-                currentLat = pos.coords.latitude;
-                currentLng = pos.coords.longitude;
-                updateMarker();
-                map.setView([currentLat, currentLng], isNavigating ? 16.5 : 15.5, {animate: false});
-                hideToast();
-                maybeRestoreRouteAndRide();
-            }, err => {
-                showToast("Bigo. Paki-on ang GPS Settings.");
-                setTimeout(hideToast, 3000);
-            }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
-        }
-
-        function updateMarker() {
-            if(!marker) marker = L.marker([currentLat, currentLng], {icon: navArrowIcon}).addTo(map);
-            else marker.setLatLng([currentLat, currentLng]);
-        }
-        restoreSavedStops();
-        forceAccurateLocation(); 
-
-        let activeSearchInput = null;
-        let debounce;
-
-        function clearActiveRouteForFreeRide(options = {}) {
-            const keepInputs = options.keepInputs !== false;
-
-            if (routingControl) {
-                try { map.removeControl(routingControl); } catch (e) {}
-                routingControl = null;
-            }
-
-            activeWaypointsList = [];
-            activeLegDistances = [];
-            activeRouteCoords = [];
-            activeInstructions = [];
-            availableRouteChoices = [];
-            selectedRouteChoiceIndex = 0;
-            routeChoiceRenderToken++;
-            renderRouteChoices();
-            activeRouteDistanceKm = 0;
-            currentInstructionIndex = 0;
-            announcedInstructionKey = "";
-            currentWaypointTargetIndex = 1;
-            routeTotalTimeSeconds = 0;
-            routeRemainingMeters = 0;
-            routeRemainingTimeSeconds = 0;
-            routeRemainingMetersByIndex = [];
-            lastNearestRouteIndex = 0;
-            nextManeuverDistanceMeters = Infinity;
-            overviewModeUntil = 0;
-            isRecalculating = false;
-
-            localStorage.setItem('nav_hadRoute', '0');
-            localStorage.setItem('nav_mode', 'free');
-            localStorage.removeItem('nav_waypointTargetIndex');
-
-            if (!keepInputs) {
-                document.querySelectorAll('.dest-input').forEach(input => {
-                    input.value = '';
-                    input.removeAttribute('data-lat');
-                    input.removeAttribute('data-lng');
-                });
-                localStorage.setItem('nav_savedStops', '[]');
-            }
-
-            if (!isNavigating) {
-                document.getElementById('route-eta').innerText = 'Free Ride Mode';
-                document.getElementById('route-dist').innerText = 'GPS Tracking & Trip Meter';
-                const policyEl = document.getElementById('route-policy');
-                if (policyEl) policyEl.innerText = 'NO TOLL INTENDED • VERIFY ROADS';
-                document.body.classList.remove('route-nav-active');
-                document.body.classList.remove('free-nav-active');
-            }
-
-            savePlannerState();
-        }
-
-        function handleSearchInput(inputEl) {
-            activeSearchInput = inputEl;
-            const hadPinnedLocation = inputEl.hasAttribute('data-lat') || inputEl.hasAttribute('data-lng');
-            inputEl.removeAttribute('data-lat');
-            inputEl.removeAttribute('data-lng');
-
-            // Any edit to a previously selected destination invalidates the old route.
-            // This prevents a deleted/changed place from remaining as a hidden active route.
-            if (hadPinnedLocation || activeWaypointsList.length > 1) {
-                clearActiveRouteForFreeRide({ keepInputs: true });
-            } else {
-                savePlannerState();
-            }
-            
-            const query = inputEl.value.trim();
-            const box = document.getElementById('suggestions-box');
-            
-            if (query.length < 3) { 
-                box.style.display = 'none'; 
-                return; 
-            }
-            
-            const rect = inputEl.getBoundingClientRect();
-            box.style.top = (rect.bottom + 5) + 'px';
-            box.style.left = rect.left + 'px';
-            box.style.width = rect.width + 'px';
-            
-            box.innerHTML = `<div class="search-loading"><i class="material-icons" style="animation: spin 1s linear infinite;">autorenew</i> Naghahanap...</div>`;
-            box.style.display = 'block';
-            
-            clearTimeout(debounce);
-            debounce = setTimeout(async () => {
-                try {
-                    let url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=8`;
-                    if(currentLat && currentLng) { url += `&lat=${currentLat}&lon=${currentLng}`; }
-                    
-                    const res = await fetch(url);
-                    const data = await res.json();
-                    box.innerHTML = '';
-                    
-                    if (data.features && data.features.length > 0) {
-                        data.features.forEach(feature => {
-                            const props = feature.properties;
-                            const name = props.name || props.street || props.city;
-                            const context = [props.city, props.state].filter(Boolean).join(', ');
-                            const displayName = name + (context ? `, ${context}` : '');
-                            const lat = feature.geometry.coordinates[1];
-                            const lon = feature.geometry.coordinates[0];
-                            
-                            const div = document.createElement('div'); 
-                            div.className = 'suggestion-item';
-                            div.innerHTML = `<i class="material-icons" style="color:#1a73e8; margin-right:12px; font-size:22px;">place</i><div style="font-weight:bold; color:#444;">${displayName}</div>`;
-                            div.onclick = () => {
-                                activeSearchInput.value = name;
-                                activeSearchInput.dataset.lat = lat;
-                                activeSearchInput.dataset.lng = lon;
-                                box.style.display = 'none';
-                                savePlannerState();
-                            };
-                            box.appendChild(div);
-                        });
-                    } else {
-                        box.innerHTML = `<div class="search-loading" style="color:#ea4335;">Walang nahanap.</div>`;
-                        setTimeout(() => box.style.display = 'none', 2000);
-                    }
-                } catch(e){
-                    box.style.display = 'none';
-                }
-            }, 600);
-        }
-
-        const style = document.createElement('style');
-        style.innerHTML = `@keyframes spin { 100% { transform: rotate(360deg); } }`;
-        document.head.appendChild(style);
-
-        document.addEventListener('click', function(e) {
-            const box = document.getElementById('suggestions-box');
-            if (activeSearchInput && !activeSearchInput.contains(e.target) && !box.contains(e.target)) {
-                box.style.display = 'none';
-            }
-        });
-
-        function updatePlaceholders() {
-            const inputs = document.querySelectorAll('.dest-input');
-            inputs.forEach((input, index) => {
-                if(index === 0) {
-                    input.placeholder = "To: 1st Destination";
-                    input.previousElementSibling.innerText = "location_on";
-                    input.previousElementSibling.style.color = "#ea4335";
-                } else {
-                    let num = index + 1;
-                    let suffix = "th";
-                    if(num === 2) suffix = "nd";
-                    if(num === 3) suffix = "rd";
-                    input.placeholder = `Then to: ${num}${suffix} Destination`;
-                    input.previousElementSibling.innerText = "flag";
-                    input.previousElementSibling.style.color = "#fbbc04";
-                }
-            });
-        }
-
-        function removeStopRow(iconEl) {
-            const row = iconEl.closest('.stop-row');
-            const removedPinnedStop = !!(row && row.querySelector('.dest-input[data-lat][data-lng]'));
-            if (row) row.remove();
-            updatePlaceholders();
-
-            if (removedPinnedStop || activeWaypointsList.length > 1) {
-                clearActiveRouteForFreeRide({ keepInputs: true });
-            } else {
-                savePlannerState();
-            }
-        }
-
-        function restoreSavedStops() {
-            let saved = [];
-            try { saved = JSON.parse(localStorage.getItem('nav_savedStops') || '[]'); } catch (e) {}
-            if (!Array.isArray(saved) || saved.length === 0) return;
-
-            const container = document.getElementById('stops-container');
-            container.innerHTML = '';
-            saved.forEach((stop, index) => {
-                const div = document.createElement('div');
-                div.className = 'input-row stop-row';
-                div.style.position = 'relative';
-                const removable = index > 0 ? '<i class="material-icons remove-icon" onclick="removeStopRow(this)">cancel</i>' : '';
-                div.innerHTML = `
-                    <i class="material-icons loc-icon">${index === 0 ? 'location_on' : 'flag'}</i>
-                    <input type="text" class="dest-input" placeholder="" oninput="handleSearchInput(this)" onfocus="activateSearchMode(this)" onblur="deactivateSearchMode()" autocomplete="off">
-                    ${removable}
-                `;
-                const input = div.querySelector('input');
-                input.value = stop.name || `Destination ${index + 1}`;
-                input.dataset.lat = stop.lat;
-                input.dataset.lng = stop.lng;
-                container.appendChild(div);
-            });
-            updatePlaceholders();
-        }
-
-        function maybeRestoreRouteAndRide() {
-            if (restoreRouteStarted || !currentLat || !currentLng) return;
-
-            const validInputs = Array.from(document.querySelectorAll('.dest-input'))
-                .filter(input => input.dataset.lat && input.dataset.lng);
-
-            if (pendingRouteRestore && validInputs.length > 0) {
-                restoreRouteStarted = true;
-                calculateMultiStopRoute({ restoring: true, suppressAnalysis: true, resumeNavigation: pendingRideRestore });
-            } else if (pendingRideRestore && localStorage.getItem('nav_mode') === 'free') {
-                restoreRouteStarted = true;
-                setTimeout(() => toggleNav(false, true), 250);
-            } else if (!pendingRouteRestore && !pendingRideRestore) {
-                restoreRouteStarted = true;
-            }
-        }
-
-        function addStopInput() {
-            const container = document.getElementById('stops-container');
-            const div = document.createElement('div');
-            div.className = 'input-row stop-row';
-            div.style.position = 'relative';
-            div.innerHTML = `
-                <i class="material-icons loc-icon">flag</i>
-                <input type="text" class="dest-input" placeholder="" oninput="handleSearchInput(this)" onfocus="activateSearchMode(this)" onblur="deactivateSearchMode()" autocomplete="off">
-                <i class="material-icons remove-icon" onclick="removeStopRow(this)">cancel</i>
-            `;
-            container.appendChild(div);
-            
-            updatePlaceholders();
-            
-            const wrapper = document.getElementById('stops-wrapper');
-            wrapper.scrollTop = wrapper.scrollHeight;
-            savePlannerState();
-        }
-
-
-        // V5.4: Google Maps URLs (no API key). This OPENS Google Maps;
-        // it cannot embed Google's route engine or certify toll-free road legality.
-        window.openGoogleMapsRoute = function() {
-            const inputEls = Array.from(document.querySelectorAll('.dest-input'));
-            const stops = inputEls.map(el => {
-                const typed = (el.value || '').trim();
-                if (!typed) return null;
-                const lat = Number(el.dataset.lat);
-                const lng = Number(el.dataset.lng);
-                if (el.dataset.lat && el.dataset.lng && Number.isFinite(lat) && Number.isFinite(lng)) {
-                    return `${lat.toFixed(6)},${lng.toFixed(6)}`;
-                }
-                // Search terms work in Google Maps even if Photon did not offer a suggestion.
-                return typed;
-            }).filter(Boolean);
-
-            if (!stops.length) {
-                showToast('Ilagay muna ang destination. Kahit text lang, puwede sa Google Maps.');
-                setTimeout(hideToast, 3200);
-                return;
-            }
-            try { savePlannerState(); } catch (_) {}
-            const url = new URL('https://www.google.com/maps/dir/');
-            url.searchParams.set('api', '1');
-            url.searchParams.set('destination', stops[stops.length - 1]);
-            url.searchParams.set('travelmode', 'driving');
-            url.searchParams.set('avoid', 'tolls,highways');
-            if (Number.isFinite(currentLat) && Number.isFinite(currentLng)) {
-                url.searchParams.set('origin', `${currentLat.toFixed(6)},${currentLng.toFixed(6)}`);
-            }
-            if (stops.length > 1) url.searchParams.set('waypoints', stops.slice(0, -1).join('|'));
-            // No dir_action=navigate: let the rider review Google's alternative routes first.
-            const link = document.createElement('a');
-            link.href = url.toString();
-            link.target = '_blank';
-            link.rel = 'noopener noreferrer';
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-        };
-
-        function createStrictNoTollRouter() {
-            // Official OSRM demo endpoint using the driving profile.
-            // The URL is forced to exclude toll-class roads and request up to 3 alternatives.
-            const router = L.Routing.osrmv1({
-                serviceUrl: 'https://router.project-osrm.org/route/v1',
-                profile: 'driving',
-                timeout: 30000
-            });
-
-            const originalBuildRouteUrl = router.buildRouteUrl.bind(router);
-            router.buildRouteUrl = function(waypoints, routeOptions) {
-                let url = originalBuildRouteUrl(waypoints, routeOptions || {});
-
-                // Force strict NO-TOLL. Never silently fall back to toll roads.
-                if (/[?&]exclude=/.test(url)) {
-                    url = url.replace(/([?&])exclude=[^&]*/i, '$1exclude=toll');
-                } else {
-                    url += (url.includes('?') ? '&' : '?') + 'exclude=toll';
-                }
-
-                // Ask OSRM for up to three usable driving alternatives.
-                if (/[?&]alternatives=/.test(url)) {
-                    url = url.replace(/([?&])alternatives=(?:true|false|\d+)/i, '$1alternatives=3');
-                } else {
-                    url += '&alternatives=3';
-                }
-
-                return url;
-            };
-
-            return router;
-        }
-
-        function applySelectedNoTollRoute(route, routeCount = null, selectedByUser = false) {
-            if (!route || !route.summary) return false;
-
-            const newDistanceKm = Number(route.summary.totalDistance || 0) / 1000;
-            const newTimeSeconds = Number(route.summary.totalTime || 0);
-
-            // Ignore duplicate initial routeselected events from Leaflet Routing Machine.
-            if (selectedByUser && Math.abs(newDistanceKm - activeRouteDistanceKm) < 0.001 &&
-                Math.abs(newTimeSeconds - routeTotalTimeSeconds) < 1) {
-                return false;
-            }
-
-            activeRouteDistanceKm = newDistanceKm;
-            const timeMin = Math.max(1, Math.round(newTimeSeconds / 60));
-            activeRouteCoords = route.coordinates || [];
-            activeInstructions = Array.isArray(route.instructions) ? route.instructions : [];
-            currentInstructionIndex = 0;
-            announcedInstructionKey = '';
-            routeTotalTimeSeconds = newTimeSeconds;
-            routeRemainingMeters = Number(route.summary.totalDistance) || 0;
-            routeRemainingTimeSeconds = routeTotalTimeSeconds;
-            routeRemainingMetersByIndex = new Array(activeRouteCoords.length).fill(0);
-
-            let remainingAccumulator = 0;
-            for (let ri = activeRouteCoords.length - 2; ri >= 0; ri--) {
-                remainingAccumulator += map.distance(activeRouteCoords[ri], activeRouteCoords[ri + 1]);
-                routeRemainingMetersByIndex[ri] = remainingAccumulator;
-            }
-            lastNearestRouteIndex = 0;
-
-            activeLegDistances = [];
-            const wpIndices = Array.isArray(route.waypointIndices) ? route.waypointIndices : [];
-            if (wpIndices.length > 1) {
-                for (let i = 1; i < wpIndices.length; i++) {
-                    let dist = 0;
-                    for (let j = wpIndices[i - 1]; j < wpIndices[i]; j++) {
-                        if (activeRouteCoords[j] && activeRouteCoords[j + 1]) {
-                            dist += map.distance(activeRouteCoords[j], activeRouteCoords[j + 1]);
-                        }
-                    }
-                    activeLegDistances.push(dist / 1000);
-                }
-            } else if (activeRouteDistanceKm > 0) {
-                activeLegDistances = [activeRouteDistanceKm];
-            }
-
-            const stopCountText = activeWaypointsList.length > 2 ? `(${activeWaypointsList.length - 1} Destinations) • ` : '';
-            document.getElementById('route-eta').innerText = timeMin + ' min';
-            document.getElementById('route-dist').innerText = stopCountText + activeRouteDistanceKm.toFixed(1) + ' km • NO-TOLL Motorcycle Route';
-
-            const policyEl = document.getElementById('route-policy');
-            if (policyEl) {
-                if (routeCount && routeCount > 1) policyEl.innerText = `NO TOLL • ${routeCount} CAR ROUTES FOUND`;
-                else policyEl.innerText = 'NO TOLL • CAR ROUTE';
-            }
-
-            if (routingControl) {
-                activeWaypointsList = routingControl.getWaypoints().map(wp => wp.latLng);
-            }
-            savePlannerState();
-
-            if (selectedByUser) {
-                showToast('NO-TOLL alternate route selected');
-                speak('Alternative no toll route selected.', true);
-                setTimeout(hideToast, 1600);
-            }
-
-            return true;
-        }
-
-
-        function routeKey(route) {
-            const d = Math.round(Number(route?.summary?.totalDistance || 0));
-            const t = Math.round(Number(route?.summary?.totalTime || 0));
-            return `${d}:${t}`;
-        }
-
-        function majorRoadNames(route) {
-            const seen = new Set();
-            const roads = [];
-            (route?.instructions || []).forEach(inst => {
-                const road = String(inst?.road || '').trim();
-                if (!road || seen.has(road.toLowerCase())) return;
-                seen.add(road.toLowerCase());
-                roads.push(road);
-            });
-            return roads.slice(0, 3);
-        }
-
-        function mapOsrmStepType(step) {
-            const type = String(step?.maneuver?.type || '').toLowerCase();
-            const mod = String(step?.maneuver?.modifier || '').toLowerCase();
-            if (type === 'arrive') return 'DestinationReached';
-            if (type === 'depart') return 'StartAt';
-            if (type.includes('roundabout') || type === 'rotary') return 'Roundabout';
-            if (type === 'uturn' || mod === 'uturn') return 'TurnAround';
-            if (mod === 'sharp left') return 'SharpLeft';
-            if (mod === 'sharp right') return 'SharpRight';
-            if (mod === 'slight left') return 'SlightLeft';
-            if (mod === 'slight right') return 'SlightRight';
-            if (mod === 'left') return 'Left';
-            if (mod === 'right') return 'Right';
-            return 'Straight';
-        }
-
-        function nearestCoordIndex(coords, location, startAt = 0) {
-            if (!coords.length || !Array.isArray(location)) return Math.max(0, startAt);
-            const target = L.latLng(location[1], location[0]);
-            let best = Math.max(0, Math.min(startAt, coords.length - 1));
-            let bestDist = Infinity;
-            const end = Math.min(coords.length - 1, best + 350);
-            for (let i = best; i <= end; i++) {
-                const d = map.distance(coords[i], target);
-                if (d < bestDist) { bestDist = d; best = i; }
-            }
-            return best;
-        }
-
-        function rawOsrmRouteToLeaflet(rawRoute, wps, label = '') {
-            const geo = rawRoute?.geometry?.coordinates || [];
-            const coords = geo.map(c => L.latLng(c[1], c[0]));
-            const instructions = [];
-            let searchIndex = 0;
-            (rawRoute?.legs || []).forEach(leg => {
-                (leg?.steps || []).forEach(step => {
-                    const idx = nearestCoordIndex(coords, step?.maneuver?.location, searchIndex);
-                    searchIndex = idx;
-                    instructions.push({
-                        distance: Number(step?.distance || 0),
-                        time: Number(step?.duration || 0),
-                        type: mapOsrmStepType(step),
-                        road: step?.name || step?.ref || '',
-                        direction: '',
-                        exit: step?.maneuver?.exit,
-                        index: idx
-                    });
-                });
-            });
-            return {
-                name: label || 'Alternate route',
-                summary: { totalDistance: Number(rawRoute?.distance || 0), totalTime: Number(rawRoute?.duration || 0) },
-                coordinates: coords,
-                waypoints: wps,
-                inputWaypoints: wps.map(ll => ({latLng: ll})),
-                instructions,
-                waypointIndices: [0, Math.max(0, coords.length - 1)],
-                _localRoadCandidate: true
-            };
-        }
-
-        function rawRouteHasClass(rawRoute, className) {
-            const wanted = String(className).toLowerCase();
-            for (const leg of (rawRoute?.legs || [])) {
-                for (const step of (leg?.steps || [])) {
-                    for (const inter of (step?.intersections || [])) {
-                        const classes = Array.isArray(inter?.classes) ? inter.classes : [];
-                        if (classes.some(c => String(c).toLowerCase() === wanted)) return true;
-                    }
-                }
-            }
-            return false;
-        }
-
-        async function fetchLocalRoadNoTollChoices(wps) {
-            // Secondary probe: force no motorway, then reject any route still tagged toll.
-            // This gives a lower-speed/local-road option while preserving strict NO-TOLL policy.
-            if (!Array.isArray(wps) || wps.length !== 2) return [];
-            const coords = wps.map(ll => `${ll.lng},${ll.lat}`).join(';');
-            const url = `https://router.project-osrm.org/route/v1/driving/${coords}?alternatives=3&steps=true&overview=full&geometries=geojson&exclude=motorway`;
-            try {
-                const res = await fetch(url);
-                if (!res.ok) return [];
-                const data = await res.json();
-                if (data?.code !== 'Ok' || !Array.isArray(data?.routes)) return [];
-                return data.routes
-                    .filter(r => !rawRouteHasClass(r, 'toll'))
-                    .map((r, i) => rawOsrmRouteToLeaflet(r, wps, i === 0 ? 'Local roads' : `Local alternate ${i + 1}`));
-            } catch (e) {
-                return [];
-            }
-        }
-
-        function chooseRouteFromCard(index) {
-            const route = availableRouteChoices[index];
-            if (!route) return;
-            selectedRouteChoiceIndex = index;
-            const alternatives = availableRouteChoices.filter((_, i) => i !== index);
-            try {
-                if (routingControl && typeof routingControl.selectRoute === 'function') {
-                    routingControl.selectRoute({ route, alternatives });
-                } else if (routingControl && typeof routingControl._routeSelected === 'function') {
-                    routingControl._routeSelected({ route, alternatives });
-                } else {
-                    applySelectedNoTollRoute(route, availableRouteChoices.length, true);
-                }
-            } catch (e) {
-                applySelectedNoTollRoute(route, availableRouteChoices.length, true);
-            }
-            renderRouteChoices();
-        }
-        window.chooseRouteFromCard = chooseRouteFromCard;
-
-        function renderRouteChoices() {
-            const panel = document.getElementById('route-choice-panel');
-            const note = document.getElementById('route-choice-note');
-            if (!panel) return;
-            if (!availableRouteChoices.length) {
-                panel.style.display = 'none';
-                if (note) note.style.display = 'none';
-                panel.innerHTML = '';
-                return;
-            }
-
-            const minTime = Math.min(...availableRouteChoices.map(r => Number(r?.summary?.totalTime || Infinity)));
-            const minDist = Math.min(...availableRouteChoices.map(r => Number(r?.summary?.totalDistance || Infinity)));
-            panel.innerHTML = availableRouteChoices.map((r, i) => {
-                const sec = Number(r?.summary?.totalTime || 0);
-                const km = Number(r?.summary?.totalDistance || 0) / 1000;
-                const mins = Math.max(1, Math.round(sec / 60));
-                const roads = majorRoadNames(r);
-                const isLocal = !!r._localRoadCandidate;
-                let title = i === 0 ? 'Recommended' : `Route ${i + 1}`;
-                if (isLocal) title = 'Local Roads';
-                else if (Math.abs(sec - minTime) < 1) title = 'Fastest No Toll';
-                else if (Math.abs(Number(r?.summary?.totalDistance || 0) - minDist) < 1) title = 'Shortest No Toll';
-                const badge = isLocal ? 'LOCAL ROAD REQUEST • VERIFY' : 'AVOID TOLL REQUEST • VERIFY';
-                return `<button class="route-choice-card ${i === selectedRouteChoiceIndex ? 'selected' : ''}" onclick="chooseRouteFromCard(${i})">
-                    <div class="route-choice-top"><div class="route-choice-title">${title}</div><div class="route-choice-eta">${mins} min</div></div>
-                    <div class="route-choice-meta">${km.toFixed(km >= 10 ? 0 : 1)} km</div>
-                    <div class="route-choice-roads">${roads.length ? roads.join(' • ') : 'Driving road route'}</div>
-                    <div class="route-choice-badge ${isLocal ? 'local' : ''}">${badge}</div>
-                </button>`;
-            }).join('');
-            panel.style.display = availableRouteChoices.length > 1 ? 'flex' : 'none';
-            if (note) note.style.display = availableRouteChoices.length > 1 ? 'block' : 'none';
-        }
-
-        async function buildRouteChoiceSet(primaryRoutes, wps, token) {
-            const merged = [];
-            const keys = new Set();
-            const pushUnique = route => {
-                if (!route?.summary || !route?.coordinates?.length) return;
-                const k = routeKey(route);
-                if (keys.has(k)) return;
-                keys.add(k);
-                merged.push(route);
-            };
-
-            (primaryRoutes || []).forEach(pushUnique);
-            const localRoutes = await fetchLocalRoadNoTollChoices(wps);
-            if (token !== routeChoiceRenderToken) return;
-            localRoutes.forEach(pushUnique);
-
-            // Prefer a local-road/no-motorway option first when available, then fastest toll-free routes.
-            merged.sort((a, b) => {
-                const al = a._localRoadCandidate ? 0 : 1;
-                const bl = b._localRoadCandidate ? 0 : 1;
-                if (al !== bl) return al - bl;
-                return Number(a?.summary?.totalTime || Infinity) - Number(b?.summary?.totalTime || Infinity);
-            });
-
-            availableRouteChoices = merged.slice(0, 4);
-            selectedRouteChoiceIndex = 0;
-            renderRouteChoices();
-
-            if (routingControl && availableRouteChoices.length > 1) {
-                try { routingControl.setAlternatives(availableRouteChoices); } catch (e) {}
-                try {
-                    const first = availableRouteChoices[0];
-                    const alternatives = availableRouteChoices.slice(1);
-                    suppressRouteChoiceAnnouncement = true;
-                    if (typeof routingControl.selectRoute === 'function') routingControl.selectRoute({route:first, alternatives});
-                    else if (typeof routingControl._routeSelected === 'function') routingControl._routeSelected({route:first, alternatives});
-                    suppressRouteChoiceAnnouncement = false;
-                } catch (e) {
-                    suppressRouteChoiceAnnouncement = false;
-                    applySelectedNoTollRoute(availableRouteChoices[0], availableRouteChoices.length, false);
-                }
-            }
-        }
-
-        function calculateMultiStopRoute(options = {}) {
-            if(!currentLat) { forceAccurateLocation(); return; }
-            
-            const inputs = document.querySelectorAll('.dest-input');
-            const wps = [L.latLng(currentLat, currentLng)];
-            
-            inputs.forEach(input => {
-                if (input.dataset.lat && input.dataset.lng) {
-                    wps.push(L.latLng(input.dataset.lat, input.dataset.lng));
-                }
-            });
-
-            if (wps.length < 2) {
-                alert("Pumili ng valid na lokasyon mula sa suggestions.");
-                return;
-            }
-
-            activeWaypointsList = wps;
-            savePlannerState();
-            
-            if(routingControl) map.removeControl(routingControl);
-            showToast("Kinakalkula ang ruta...");
-            
-            routingControl = L.Routing.control({
-                waypoints: wps,
-                // STRICT NO-TOLL MOTOR-VEHICLE ROUTING.
-                // Every returned route must respect exclude=toll; no toll fallback is allowed.
-                router: createStrictNoTollRouter(), 
-                routeWhileDragging: false,
-                addWaypoints: false,
-                
-                // ENABLE ALTERNATIVE ROUTES (BLUE LINES)
-                showAlternatives: true, 
-                altLineOptions: { styles: [{color: '#8da4ba', opacity: 0.45, weight: 5}] }, 
-                lineOptions: { styles: [{color: 'rgba(255,255,255,0.92)', opacity: 0.9, weight: 10}, {color: '#287cff', opacity: 1, weight: 6}] }, 
-                
-                createMarker: function(i, wp, nWps) { 
-                    if (i === 0) return null; 
-                    
-                    let isFinal = (i === nWps - 1);
-                    let markerClass = isFinal ? 'stop-final' : 'stop-intermediate';
-                    let label = isFinal ? 'FINAL DEST' : 'DEST ' + i;
-                    
-                    let html = `
-                    <div class="marker-wrapper">
-                        <div class="stop-marker ${markerClass}">${label}</div>
-                        <div class="drag-hint"><i class="material-icons" style="font-size:10px; vertical-align:middle;">touch_app</i> Drag to move</div>
-                    </div>`;
-                    
-                    let marker = L.marker(wp.latLng, {
-                        draggable: true, 
-                        icon: L.divIcon({ className: '', html: html, iconAnchor: [45, 50] })
-                    }); 
-                    
-                    marker.on('dragend', function(e) {
-                        let newLatLng = e.target.getLatLng();
-                        let currentWaypoints = routingControl.getWaypoints();
-                        currentWaypoints[i].latLng = newLatLng;
-                        routingControl.setWaypoints(currentWaypoints);
-                        const input = document.querySelectorAll('.dest-input')[i - 1];
-                        if (input) {
-                            input.dataset.lat = newLatLng.lat;
-                            input.dataset.lng = newLatLng.lng;
-                        }
-                        savePlannerState();
-                        showToast("Re-calculating route...");
-                    });
-                    
-                    return marker;
-                }
-            }).on('routesfound', function(e) {
-                hideToast();
-                const wasRecalculating = isRecalculating;
-                isRecalculating = false;
-
-                const routes = Array.isArray(e.routes) ? e.routes : [];
-                if (!routes.length) {
-                    const policyEl = document.getElementById('route-policy');
-                    if (policyEl) policyEl.innerText = 'NO TOLL • NO ROUTE FOUND';
-                    showToast('Walang toll-free car route na nahanap.');
-                    speak('No toll free driving route was found.', true);
-                    setTimeout(hideToast, 3200);
-                    return;
-                }
-
-                applySelectedNoTollRoute(routes[0], routes.length, false);
-
-                // Build explicit Google-Maps-like route choices and probe for a local-road/no-motorway option.
-                const choiceToken = ++routeChoiceRenderToken;
-                const choiceWps = routingControl ? routingControl.getWaypoints().map(wp => wp.latLng) : activeWaypointsList.slice();
-                if (!options.resumeNavigation && !wasRecalculating) {
-                    buildRouteChoiceSet(routes, choiceWps, choiceToken);
-                } else {
-                    availableRouteChoices = routes.slice(0, 4);
-                    selectedRouteChoiceIndex = 0;
-                    renderRouteChoices();
-                }
-
-                if (routes.length > 1 && !options.resumeNavigation && !wasRecalculating) {
-                    showToast(`${routes.length} in-app routes • verify toll/highway restrictions before travel`);
-                    setTimeout(hideToast, 2200);
-                }
-
-                if (options.resumeNavigation && !isNavigating) {
-                    currentWaypointTargetIndex = Math.max(1, parseInt(localStorage.getItem('nav_waypointTargetIndex') || '1', 10));
-                    lastSpokenKm = Math.max(0, parseInt(localStorage.getItem('nav_lastSpokenKm') || '0', 10));
-                    setTimeout(() => toggleNav(false, true), 250);
-                } else if (wasRecalculating && isNavigating) {
-                    speak('New no toll route ready.', true);
-                } else if (!options.suppressAnalysis) {
-                    runSmartAnalysis(activeRouteDistanceKm, activeLegDistances);
-                }
-
-            }).on('routeselected', function(e) {
-                // Route can be selected by tapping a map line or one of the explicit route cards.
-                if (e && e.route) {
-                    applySelectedNoTollRoute(e.route, availableRouteChoices.length || null, !suppressRouteChoiceAnnouncement);
-                    const selectedKey = routeKey(e.route);
-                    const idx = availableRouteChoices.findIndex(r => routeKey(r) === selectedKey);
-                    if (idx >= 0) selectedRouteChoiceIndex = idx;
-                    renderRouteChoices();
-                }
-
-            }).on('routingerror', function() {
-                hideToast();
-                isRecalculating = false;
-                const policyEl = document.getElementById('route-policy');
-                if (policyEl) policyEl.innerText = 'NO TOLL • NO ROUTE FOUND';
-                showToast("In-app routing unavailable. Tap GOOGLE MAPS ROUTES to view route choices.");
-                speak("In app routing is unavailable. You can check routes in Google Maps.", true);
-                setTimeout(hideToast, 4200);
-            }).addTo(map);
-        }
-
-        function runSmartAnalysis(totalDistKm, legDistances) {
-            if(!totalDistKm || !legDistances) return;
-
-            const currentRange = (currentLiveBattery / 100) * maxRangeLimit;
-            const roundTrip = totalDistKm * 2;
-            const kmPerHourCharge = maxRangeLimit / Math.max(fullChargeHours, 0.1);
-            let voiceMessage = "";
-
-            if (totalDistKm > currentRange) {
-                let reachableStop = -1;
-                let accumulatedDist = 0;
-
-                if (legDistances.length > 1) {
-                    for(let i = 0; i < legDistances.length - 1; i++) {
-                        accumulatedDist += legDistances[i];
-                        if (currentRange >= accumulatedDist) reachableStop = i + 1;
-                    }
-                }
-
-                if (reachableStop !== -1) {
-                    voiceMessage = `Warning. Your battery is not enough for the full trip. You can reach Destination ${reachableStop}, but you should charge there before continuing.`;
-                } else {
-                    voiceMessage = "Critical battery warning. Your first destination is outside your estimated remaining range. Please charge before starting the trip.";
-                }
-            } else if (roundTrip > currentRange) {
-                const deficit = roundTrip - currentRange;
-                const hoursNeeded = Math.max(0.1, deficit / kmPerHourCharge);
-                const roundedHours = Math.ceil(hoursNeeded * 10) / 10;
-                voiceMessage = `Battery check. You can reach your destination, but the estimated range is not enough for the return trip. Charge for at least ${roundedHours} hours before going back.`;
-            } else {
-                const remaining = Math.max(0, currentRange - roundTrip);
-                voiceMessage = `Battery check complete. Estimated range is enough for the round trip, with about ${remaining.toFixed(1)} kilometers of range remaining.`;
-            }
-
-            // VOICE ONLY — no analysis modal or on-screen breakdown
-            speak(voiceMessage, true);
-        }
-
-        window.runManualAnalysis = function() {
-            if(activeRouteDistanceKm > 0 && activeLegDistances.length > 0) {
-                runSmartAnalysis(activeRouteDistanceKm, activeLegDistances);
-            } else {
-                showToast("Maghanap muna ng ruta bago mag-voice range check.");
-                setTimeout(hideToast, 2000);
-            }
-        }
-
-        function manualDataUpdate() {
-            startBattery = parseFloat(document.getElementById('battery-input').value) || 0;
-            if(startBattery > 100) startBattery = 100;
-            if(startBattery < 0) startBattery = 0;
-            maxRangeLimit = parseFloat(document.getElementById('max-range-input').value) || 30.0;
-            tripDistance = 0; 
-            lastSpokenKm = 0;
-            saveState();
-            updateDashboard();
-        }
-
-        function updateDashboard() {
-            let batteryUsed = (tripDistance / maxRangeLimit) * 100;
-            currentLiveBattery = startBattery - batteryUsed;
-            if(currentLiveBattery < 0) currentLiveBattery = 0;
-            
-            let currentRange = (currentLiveBattery / 100) * maxRangeLimit;
-            
-            document.getElementById('disp-trip').innerText = tripDistance.toFixed(2);
-            const batEl = document.getElementById('disp-bat');
-            batEl.innerText = Math.round(currentLiveBattery) + "%";
-            batEl.className = currentLiveBattery <= 20 ? "dash-val red" : "dash-val";
-            document.getElementById('disp-range').innerText = currentRange.toFixed(1);
-        }
-
-        window.resetTripMeter = function() {
-            startBattery = currentLiveBattery;
-            tripDistance = 0; 
-            lastSpokenKm = 0;
-            document.getElementById('battery-input').value = Math.round(startBattery);
-            saveState();
-            updateDashboard();
-        }
-        updateDashboard();
-
-        window.toggleNav = function(silentEnd = false, silentStart = false) {
-            if(!isNavigating) {
-                if (!currentLat || !currentLng) { forceAccurateLocation(); return; }
-                isNavigating = true;
-                lastTrackedCoords = {lat: currentLat, lng: currentLng}; 
-                spokenArrivalWarning = false;
-                currentWaypointTargetIndex = 1; 
-                
-                document.getElementById('search-panel').classList.add('hidden');
-                document.getElementById('btn-start').style.display = 'none';
-                document.getElementById('btn-stop').style.display = 'flex';
-
-                const hasPinnedDestination = Array.from(document.querySelectorAll('.dest-input'))
-                    .some(input => input.dataset.lat && input.dataset.lng);
-                if (!hasPinnedDestination && activeWaypointsList.length > 1) {
-                    clearActiveRouteForFreeRide({ keepInputs: true });
-                }
-                const routeMode = hasPinnedDestination && activeWaypointsList.length > 1;
-                document.body.classList.toggle('route-nav-active', routeMode);
-                document.body.classList.toggle('free-nav-active', !routeMode);
-                
-                if (!routeMode) {
-                    document.getElementById('turn-banner').style.display = 'flex';
-                    setTimeout(()=> document.getElementById('turn-banner').style.opacity = '1', 50);
-                } else {
-                    document.getElementById('turn-banner').style.display = 'none';
-                    document.getElementById('turn-banner').style.opacity = '0';
-                    updateTeslaTripProgress(true);
-                }
-                
-                map.dragging.disable();
-                map.touchZoom.disable();
-                map.setView([currentLat, currentLng], 16.5, {animate: false});
-                
-                if(routeMode) {
-                    if (!silentStart) speak("Motorcycle navigation started. Follow the route.", true);
-                    document.getElementById('turn-text').innerText = "Motorcycle route";
-                    document.getElementById('turn-icon').innerText = "straight";
-                } else {
-                    if (!silentStart) speak("Free ride started. Tracking trip and battery.", true);
-                    document.getElementById('turn-text').innerText = "Free Ride Mode";
-                    document.getElementById('turn-icon').innerText = "explore";
-                }
-                savePlannerState();
-            } else {
-                isNavigating = false;
-                document.body.classList.remove('route-nav-active', 'free-nav-active');
-                overviewModeUntil = 0;
-                nextManeuverDistanceMeters = Infinity;
-                
-                document.getElementById('search-panel').classList.remove('hidden');
-                document.getElementById('btn-start').style.display = 'flex';
-                document.getElementById('btn-stop').style.display = 'none';
-                
-                document.getElementById('turn-banner').style.opacity = '0';
-                setTimeout(()=> document.getElementById('turn-banner').style.display = 'none', 300);
-                
-                map.dragging.enable();
-                map.touchZoom.enable();
-                document.getElementById('map').style.transform = 'none';
-                const arrowEl = document.getElementById('nav-arrow');
-                if(arrowEl) { arrowEl.style.transform = `rotate(0deg)`; }
-                
-                map.setZoom(16, {animate: false});
-                if (!silentEnd) speak("Navigation ended.", true);
-                autoStartCooldownUntil = Date.now() + 15000;
-                savePlannerState();
-            }
-        }
-
-        function maybeAutoStartFromMovement(pos, speedKmh) {
-            if (!autoStartOnMove || isNavigating || Date.now() < autoStartCooldownUntil) return;
-            const accuracy = Number.isFinite(pos.coords.accuracy) ? pos.coords.accuracy : 999;
-            if (accuracy > 45) { autoMotionConfirmations = 0; return; }
-
-            const point = L.latLng(pos.coords.latitude, pos.coords.longitude);
-            if (!autoMotionAnchor) {
-                autoMotionAnchor = point;
-                return;
-            }
-
-            const movedFromAnchor = map.distance(autoMotionAnchor, point);
-            const movingBySpeed = speedKmh >= 5;
-            const movingByDistance = movedFromAnchor >= 12;
-
-            if (movingBySpeed || movingByDistance) {
-                autoMotionConfirmations++;
-            } else if (speedKmh < 2 && movedFromAnchor < 5) {
-                autoMotionConfirmations = 0;
-                autoMotionAnchor = point;
-            }
-
-            if (autoMotionConfirmations >= 2) {
-                autoMotionConfirmations = 0;
-                autoMotionAnchor = point;
-                const hasPinnedDestination = Array.from(document.querySelectorAll('.dest-input'))
-                    .some(input => input.dataset.lat && input.dataset.lng);
-                const hasRoute = hasPinnedDestination && activeWaypointsList.length > 1;
-                if (!hasRoute && activeWaypointsList.length > 1) {
-                    clearActiveRouteForFreeRide({ keepInputs: true });
-                }
-                toggleNav(false, false);
-                showToast(hasRoute ? 'Movement detected • Navigation started' : 'Movement detected • Free Ride started');
-                setTimeout(hideToast, 2200);
-            }
-        }
-
-        if (navigator.geolocation) {
-            navigator.geolocation.watchPosition(pos => {
-                if(!currentLat) return;
-                currentLat = pos.coords.latitude;
-                currentLng = pos.coords.longitude;
-                const speed = pos.coords.speed ? (pos.coords.speed * 3.6) : 0;
-                currentSpeedKmh = speed;
-                if (pos.coords.heading !== null && !isNaN(pos.coords.heading) && speed > 1) currentHeadingDeg = pos.coords.heading;
-                
-                document.getElementById('disp-speed').innerHTML = Math.round(speed) + ' <span style="font-size:12px;">km/h</span>';
-                updateMarker();
-                maybeAutoStartFromMovement(pos, speed);
-
-                if(isNavigating) {
-                    if (document.body.classList.contains('route-nav-active')) {
-                        updateTeslaNavigationCamera();
-                        updateTeslaTripProgress();
-                    } else if (Date.now() - lastMapFollowAt > 650) {
-                        lastMapFollowAt = Date.now();
-                        map.panTo([currentLat, currentLng], {animate: false});
-                    }
-                    
-                    if(lastTrackedCoords) {
-                        const movedMeters = map.distance(lastTrackedCoords, [currentLat, currentLng]);
-                        const accuracy = Number.isFinite(pos.coords.accuracy) ? pos.coords.accuracy : 999;
-
-                        // Ignore GPS jitter and impossible jumps. This keeps the trip meter stable while stopped.
-                        if (accuracy <= 50 && movedMeters >= 3 && movedMeters <= 250) {
-                            tripDistance += movedMeters / 1000;
-                            updateDashboard();
-                            if (Date.now() - lastStatePersistAt > 5000) {
-                                lastStatePersistAt = Date.now();
-                                saveState();
-                            }
-                            lastTrackedCoords = {lat: currentLat, lng: currentLng};
-                        } else if (movedMeters > 250) {
-                            // Re-anchor after a GPS jump without charging the jump to trip distance.
-                            lastTrackedCoords = {lat: currentLat, lng: currentLng};
-                        }
-                    } else {
-                        lastTrackedCoords = {lat: currentLat, lng: currentLng};
-                    }
-
-                    let currentIntKm = Math.floor(tripDistance);
-                    if (currentIntKm > lastSpokenKm && currentIntKm > 0) {
-                        speak(`You have traveled ${currentIntKm} kilometers.`);
-                        lastSpokenKm = currentIntKm;
-                    }
-
-                    // OFF-ROUTE AUTO RECALCULATION
-                    if (activeRouteCoords.length > 0 && !isRecalculating && (Date.now() - lastRouteDeviationCheckAt) > 1800) {
-                        lastRouteDeviationCheckAt = Date.now();
-                        let isOffRoute = true;
-                        let minOffDist = Infinity;
-                        let currentLL = L.latLng(currentLat, currentLng);
-
-                        const routeSampleStep = Math.max(1, Math.floor(activeRouteCoords.length / 450));
-                        for(let i=0; i<activeRouteCoords.length; i += routeSampleStep) {
-                            let dist = map.distance(currentLL, activeRouteCoords[i]);
-                            if (dist < 50) { // SAFE: Within 50 meters of the blue line
-                                isOffRoute = false;
-                                break;
-                            }
-                            if (dist < minOffDist) minOffDist = dist;
-                        }
-
-                        if (isOffRoute && minOffDist > 60 && (Date.now() - lastOffRouteRecalcAt) > 8000) {
-                            isRecalculating = true;
-                            lastOffRouteRecalcAt = Date.now();
-                            speak("You are off route. Recalculating.", true);
-                            showToast("Lihis sa ruta. Recalculating...");
-
-                            // Update origin to current location and force the road router to recalculate.
-                            activeWaypointsList[0] = currentLL;
-                            routingControl.setWaypoints(activeWaypointsList);
-                            activeRouteCoords = [];
-                        }
-                    }
-
-                    // TURN-BY-TURN VOICE NAVIGATION
-                    processTurnInstructions();
-
-                    // ARRIVAL WARNING LOGIC
-                    if (activeWaypointsList.length > currentWaypointTargetIndex) {
-                        const targetWP = activeWaypointsList[currentWaypointTargetIndex];
-                        const d = map.distance([currentLat, currentLng], targetWP); 
-                        
-                        const isFinalStop = (currentWaypointTargetIndex === activeWaypointsList.length - 1);
-
-                        if (d <= 500 && d > 50 && !spokenArrivalWarning) {
-                            if (isFinalStop) {
-                                speak("You are approaching your final destination.", true);
-                            } else {
-                                speak(`You are approaching Destination ${currentWaypointTargetIndex}.`, true);
-                            }
-                            spokenArrivalWarning = true;
-                        } else if (d <= 50) {
-                            if (isFinalStop) {
-                                speak("You have arrived at your final destination.", true);
-                                toggleNav(true); 
-                            } else {
-                                speak(`You have arrived at Destination ${currentWaypointTargetIndex}. Continuing to next route.`, true);
-                                currentWaypointTargetIndex++;
-                                spokenArrivalWarning = false; 
-                            }
-                        }
-                    }
-                }
-
-                if(speed > 1 && pos.coords.heading !== null && !isNaN(pos.coords.heading)) {
-                    let newHeading = pos.coords.heading;
-                    let diff = newHeading - previousHeading;
-                    
-                    if (diff > 180) diff -= 360;
-                    else if (diff < -180) diff += 360;
-                    
-                    accumulatedRotation += diff;
-                    previousHeading = newHeading;
-                    currentHeadingDeg = newHeading;
-                    
-                    const arrowEl = document.getElementById('nav-arrow');
-                    if(arrowEl) { arrowEl.style.transform = `rotate(${accumulatedRotation}deg)`; }
-                }
-            }, err => {}, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }); 
-        }
-
-        function showToast(msg) {
-            const t = document.getElementById('toast');
-            t.innerText = msg; t.style.display = 'block';
-        }
-        function hideToast() { document.getElementById('toast').style.display = 'none'; }
-        
-        function instructionToVoice(inst) {
-            if (!inst) return "Continue on the route.";
-            const type = String(inst.type || "").toLowerCase();
-            const road = inst.road ? ` onto ${inst.road}` : "";
-
-            if (type.includes("sharp") && type.includes("left")) return `Make a sharp left${road}.`;
-            if (type.includes("sharp") && type.includes("right")) return `Make a sharp right${road}.`;
-            if (type.includes("slight") && type.includes("left")) return `Keep slightly left${road}.`;
-            if (type.includes("slight") && type.includes("right")) return `Keep slightly right${road}.`;
-            if (type.includes("left")) return `Turn left${road}.`;
-            if (type.includes("right")) return `Turn right${road}.`;
-            if (type.includes("roundabout")) return `Enter the roundabout${inst.exit ? ` and take exit ${inst.exit}` : ""}.`;
-            if (type.includes("uturn") || type.includes("turnaround")) return "Make a U-turn when safe.";
-            if (type.includes("destination")) return "Your destination is ahead.";
-            if (type.includes("waypoint")) return "Your next stop is ahead.";
-            return road ? `Continue${road}.` : "Continue straight.";
-        }
-
-        function instructionIcon(inst) {
-            const type = String(inst?.type || "").toLowerCase();
-            if (type.includes("left")) return "turn_left";
-            if (type.includes("right")) return "turn_right";
-            if (type.includes("roundabout")) return "roundabout_right";
-            if (type.includes("uturn") || type.includes("turnaround")) return "u_turn_left";
-            if (type.includes("destination") || type.includes("waypoint")) return "place";
-            return "straight";
-        }
-
-        function processTurnInstructions() {
-            if (!isNavigating || !activeInstructions.length || !activeRouteCoords.length) return;
-
-            // Skip instructions that are already behind the rider.
-            while (currentInstructionIndex < activeInstructions.length) {
-                const inst = activeInstructions[currentInstructionIndex];
-                const coordIndex = Number(inst.index);
-                if (!Number.isFinite(coordIndex) || !activeRouteCoords[coordIndex]) {
-                    currentInstructionIndex++;
-                    continue;
-                }
-
-                const target = activeRouteCoords[coordIndex];
-                const distanceMeters = map.distance([currentLat, currentLng], target);
-                const keyBase = `${currentInstructionIndex}`;
-
-                const bannerText = instructionToVoice(inst).replace(/\.$/, "");
-                nextManeuverDistanceMeters = distanceMeters;
-                document.getElementById('turn-text').innerText =
-                    distanceMeters > 1000
-                        ? `${(distanceMeters / 1000).toFixed(1)} km • ${bannerText}`
-                        : `${Math.max(0, Math.round(distanceMeters / 10) * 10)} m • ${bannerText}`;
-                document.getElementById('turn-icon').innerText = instructionIcon(inst);
-                updateTeslaTurnHud(inst, distanceMeters);
-
-                if (distanceMeters <= 250 && distanceMeters > 70 && announcedInstructionKey !== `${keyBase}-250`) {
-                    announcedInstructionKey = `${keyBase}-250`;
-                    speak(`In ${Math.round(distanceMeters / 10) * 10} meters, ${instructionToVoice(inst)}`);
-                    return;
-                }
-
-                if (distanceMeters <= 70 && announcedInstructionKey !== `${keyBase}-now`) {
-                    announcedInstructionKey = `${keyBase}-now`;
-                    speak(instructionToVoice(inst), true);
-                    return;
-                }
-
-                // Once very close to the maneuver, move to the next one.
-                if (distanceMeters <= 25) {
-                    currentInstructionIndex++;
-                    announcedInstructionKey = "";
-                    continue;
-                }
-
-                break;
-            }
-        }
-
-
-        function instructionActionText(inst) {
-            const type = String(inst?.type || "").toLowerCase();
-            if (type.includes("sharp") && type.includes("left")) return "Sharp left";
-            if (type.includes("sharp") && type.includes("right")) return "Sharp right";
-            if (type.includes("slight") && type.includes("left")) return "Keep left";
-            if (type.includes("slight") && type.includes("right")) return "Keep right";
-            if (type.includes("left")) return "Turn left";
-            if (type.includes("right")) return "Turn right";
-            if (type.includes("roundabout")) return inst?.exit ? `Take exit ${inst.exit}` : "Enter roundabout";
-            if (type.includes("uturn") || type.includes("turnaround")) return "Make a U-turn";
-            if (type.includes("destination")) return "Destination ahead";
-            if (type.includes("waypoint")) return "Next stop ahead";
-            return "Continue straight";
-        }
-
-        function formatNavDistance(meters) {
-            if (!Number.isFinite(meters)) return "Follow route";
-            if (meters >= 1000) return `${(meters / 1000).toFixed(meters >= 10000 ? 0 : 1)} km`;
-            if (meters >= 100) return `${Math.round(meters / 50) * 50} m`;
-            return `${Math.max(10, Math.round(meters / 10) * 10)} m`;
-        }
-
-        function updateTeslaTurnHud(inst, distanceMeters) {
-            const icon = document.getElementById('tesla-turn-icon');
-            const dist = document.getElementById('tesla-turn-distance');
-            const action = document.getElementById('tesla-turn-action');
-            const road = document.getElementById('tesla-turn-road');
-            if (!icon || !dist || !action || !road) return;
-            icon.innerText = instructionIcon(inst);
-            dist.innerText = formatNavDistance(distanceMeters);
-            action.innerText = instructionActionText(inst);
-            road.innerText = inst?.road ? inst.road : 'Stay on the highlighted route';
-        }
-
-        function findNearestRouteIndex() {
-            if (!activeRouteCoords.length || currentLat === null || currentLng === null) return 0;
-            const currentLL = L.latLng(currentLat, currentLng);
-            const length = activeRouteCoords.length;
-            const step = Math.max(1, Math.floor(length / 300));
-            let bestIndex = Math.min(lastNearestRouteIndex, length - 1);
-            let bestDist = Infinity;
-
-            // Search around the previous nearest point first for smooth forward progress.
-            const localStart = Math.max(0, bestIndex - step * 5);
-            const localEnd = Math.min(length - 1, bestIndex + step * 20);
-            for (let i = localStart; i <= localEnd; i += step) {
-                const d = map.distance(currentLL, activeRouteCoords[i]);
-                if (d < bestDist) { bestDist = d; bestIndex = i; }
-            }
-
-            // If local search is poor (re-route/jump), fall back to a sampled full-route search.
-            if (bestDist > 180) {
-                for (let i = 0; i < length; i += step) {
-                    const d = map.distance(currentLL, activeRouteCoords[i]);
-                    if (d < bestDist) { bestDist = d; bestIndex = i; }
-                }
-            }
-
-            // Fine search around the best sampled point.
-            const fineStart = Math.max(0, bestIndex - step);
-            const fineEnd = Math.min(length - 1, bestIndex + step);
-            for (let i = fineStart; i <= fineEnd; i++) {
-                const d = map.distance(currentLL, activeRouteCoords[i]);
-                if (d < bestDist) { bestDist = d; bestIndex = i; }
-            }
-            lastNearestRouteIndex = bestIndex;
-            return bestIndex;
-        }
-
-        function updateTeslaTripProgress(force = false) {
-            if (!activeRouteCoords.length || !routeRemainingMetersByIndex.length) return;
-            const now = Date.now();
-            if (!force && now - lastTeslaProgressAt < 1000) return;
-            lastTeslaProgressAt = now;
-
-            const idx = findNearestRouteIndex();
-            routeRemainingMeters = Math.max(0, routeRemainingMetersByIndex[idx] || 0);
-            const totalMeters = Math.max(1, activeRouteDistanceKm * 1000);
-            const ratio = Math.min(1, routeRemainingMeters / totalMeters);
-            routeRemainingTimeSeconds = Math.max(0, routeTotalTimeSeconds * ratio);
-
-            const mins = Math.max(1, Math.round(routeRemainingTimeSeconds / 60));
-            const distKm = routeRemainingMeters / 1000;
-            const arrival = new Date(Date.now() + routeRemainingTimeSeconds * 1000)
-                .toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-
-            const arrivalEl = document.getElementById('tesla-arrival');
-            const timeEl = document.getElementById('tesla-remaining-time');
-            const distEl = document.getElementById('tesla-remaining-dist');
-            const chip = document.getElementById('tesla-route-chip');
-            if (arrivalEl) arrivalEl.innerText = arrival;
-            if (timeEl) timeEl.innerText = `${mins} min`;
-            if (distEl) distEl.innerText = distKm >= 10 ? `${distKm.toFixed(0)} km` : `${distKm.toFixed(1)} km`;
-            if (chip) chip.innerHTML = `<b>${Math.round(currentSpeedKmh)}</b> km/h &nbsp;•&nbsp; ${Math.round(currentLiveBattery)}% battery`;
-        }
-
-        function destinationPoint(lat, lng, bearingDeg, distanceMeters) {
-            const R = 6378137;
-            const brng = bearingDeg * Math.PI / 180;
-            const d = distanceMeters / R;
-            const lat1 = lat * Math.PI / 180;
-            const lon1 = lng * Math.PI / 180;
-            const lat2 = Math.asin(Math.sin(lat1) * Math.cos(d) + Math.cos(lat1) * Math.sin(d) * Math.cos(brng));
-            const lon2 = lon1 + Math.atan2(Math.sin(brng) * Math.sin(d) * Math.cos(lat1), Math.cos(d) - Math.sin(lat1) * Math.sin(lat2));
-            return L.latLng(lat2 * 180 / Math.PI, lon2 * 180 / Math.PI);
-        }
-
-        function routeBearingAt(index) {
-            if (!activeRouteCoords.length) return 0;
-            const a = activeRouteCoords[Math.max(0, Math.min(index, activeRouteCoords.length - 1))];
-            const b = activeRouteCoords[Math.max(0, Math.min(index + 8, activeRouteCoords.length - 1))];
-            if (!a || !b) return 0;
-            const lat1 = a.lat * Math.PI / 180, lat2 = b.lat * Math.PI / 180;
-            const dLon = (b.lng - a.lng) * Math.PI / 180;
-            const y = Math.sin(dLon) * Math.cos(lat2);
-            const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
-            return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
-        }
-
-        function desiredTeslaZoom() {
-            if (nextManeuverDistanceMeters <= 90) return 17.0;
-            if (nextManeuverDistanceMeters <= 220) return 16.75;
-            if (currentSpeedKmh >= 70) return 15.5;
-            if (currentSpeedKmh >= 50) return 15.75;
-            if (currentSpeedKmh >= 30) return 16.0;
-            return 16.25;
-        }
-
-        function updateTeslaNavigationCamera() {
-            const now = Date.now();
-            if (now < overviewModeUntil || now - lastTeslaCameraAt < 650 || currentLat === null || currentLng === null) return;
-            lastTeslaCameraAt = now;
-
-            let lookAheadMeters = Math.min(320, Math.max(90, 100 + currentSpeedKmh * 2.1));
-            if (Number.isFinite(nextManeuverDistanceMeters) && nextManeuverDistanceMeters < 320) {
-                lookAheadMeters = Math.max(70, Math.min(145, nextManeuverDistanceMeters * 0.55));
-            }
-            const routeHeading = routeBearingAt(lastNearestRouteIndex);
-            const cameraHeading = Number.isFinite(currentHeadingDeg) ? currentHeadingDeg : routeHeading;
-            const focus = destinationPoint(currentLat, currentLng, cameraHeading, lookAheadMeters);
-            const zoom = desiredTeslaZoom();
-            map.setView(focus, zoom, { animate:false });
-        }
-
-        window.toggleTeslaOverview = function() {
-            if (!activeRouteCoords.length) return;
-            overviewModeUntil = Date.now() + 8000;
-            try {
-                const bounds = L.latLngBounds(activeRouteCoords);
-                map.fitBounds(bounds, { paddingTopLeft:[24,120], paddingBottomRight:[24,90], animate:false, maxZoom:15.75 });
-                showToast('Wider route overview • Auto-follow resumes shortly');
-                setTimeout(hideToast, 1800);
-            } catch (e) {}
-        }
-
-        window.speak = function(text, priority = false) {
-            if (!text || !window.speechSynthesis) return;
-
-            const now = Date.now();
-            // Prevent accidental repeated GPS callbacks from speaking the exact same line repeatedly.
-            if (!priority && text === lastSpeechText && (now - lastSpeechAt) < 5000) return;
-
-            if (priority) window.speechSynthesis.cancel();
-
-            const msg = new SpeechSynthesisUtterance(text);
-            msg.lang = 'en-US';
-            msg.rate = 1.0;
-            msg.pitch = 1.0;
-            msg.volume = 1.0;
-
-            lastSpeechText = text;
-            lastSpeechAt = now;
-            window.speechSynthesis.speak(msg);
-        };
-    </script>
+  <div id="free-map" aria-label="OpenStreetMap bicycle navigation with route choices"></div>
+  <div class="ui">
+    <div class="appmark glass"><i class="mi">electric_moped</i><div>e-MOTO NAV<em>FREE OSM • TESLA UI</em></div></div>
+    <div class="top-actions"><button class="round" id="settings-btn" title="Settings"><i class="mi">tune</i></button><button class="round" id="audio-btn" title="Mute or unmute"><i class="mi" id="audio-icon">volume_up</i></button></div>
+    <section class="planning glass" id="planning">
+      <div class="field-label">Destination • FREE bicycle routing</div>
+      <div class="search-row"><i class="mi">search</i><input id="destination" placeholder="Type an address or place" autocomplete="street-address" aria-label="Destination"><button class="small-icon" id="clear-destination" aria-label="Clear destination"><i class="mi">close</i></button></div>
+      <div class="action-line"><button class="primary" id="find-route"><i class="mi" style="font-size:16px;vertical-align:middle">route</i> FIND ROUTES</button><button class="ghost" id="free-ride">FREE RIDE</button></div>
+      <div class="safety-note"><b>BIKE ROUTE • PREFER WIDER ROADS</b><br>Flags known narrow alleys, footpaths and toll tags. Road width often missing in OSM: check signs and physical clearance. A 4-wheel e-bike may not be permitted on every bike lane.</div>
+    </section>
+    <div class="route-options" id="route-options" aria-label="Route options"></div>
+    <div class="place-results glass" id="place-results" aria-label="Search results"></div>
+    <div class="status" id="status">Waiting for GPS</div>
+    <section class="dashboard glass" aria-label="Trip dashboard">
+      <div class="dash-title">LIVE E-BIKE <i class="mi" style="font-size:16px;color:#8fc7ff">speed</i></div>
+      <div class="speed" id="speed">0</div><div class="speed-unit">KM / H</div>
+      <div class="dash-cells"><div class="dash-cell"><span>BATTERY</span><strong id="battery">100%</strong></div><div class="dash-cell"><span>RANGE</span><strong id="range">35 km</strong></div><div class="dash-cell"><span>TRIP</span><strong id="trip">0.0 km</strong></div><div class="dash-cell"><span>GPS</span><strong id="accuracy">—</strong></div></div>
+    </section>
+    <button class="round recenter" id="recenter" title="Follow GPS"><i class="mi">my_location</i></button>
+    <section class="bottom glass"><div class="trip-summary"><b id="summary-title">Free Ride Ready</b><span id="summary-desc">Free maps • No API key • Free Ride available</span></div><button class="start" id="start-ride">START RIDE</button></section>
+    <section class="nav-header glass"><div style="width:100%"><div class="next-label" id="nav-label">NEXT TURN</div><div class="next-turn"><i class="mi" id="turn-icon">straight</i><div><div class="turn-main" id="turn-heading">Follow the road</div><div class="turn-minor" id="turn-road">Voice navigation active</div></div></div></div></section>
+    <section class="nav-footer glass"><div class="nav-metric"><b id="eta">—</b><span>ARRIVAL</span></div><div class="nav-metric"><b id="remaining-time">—</b><span>TIME LEFT</span></div><div class="nav-metric"><b id="remaining-dist">—</b><span>DISTANCE</span></div><button class="round" id="overview" title="Route overview"><i class="mi">map</i></button><button class="round" id="end-ride" title="End ride" style="background:#d94d59"><i class="mi">close</i></button></section>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+  <script>window.addEventListener("load",()=>{if(typeof L==="undefined"){document.getElementById("status").textContent="Map library failed to load • Check internet";}});</script>
+
+  <div class="sheet" id="settings-sheet"><div class="sheet-panel">
+    <div class="sheet-title"><span>e-Moto Settings</span><button class="small-icon" id="close-settings" aria-label="Close settings"><i class="mi">close</i></button></div>
+    <div class="setting"><div>Estimated battery (%)<small>Manually update after charging</small></div><input id="battery-setting" type="number" min="0" max="100" value="100"></div>
+    <div class="setting"><div>Full-charge range (km)</div><input id="range-setting" type="number" min="1" max="500" value="35"></div>
+    <div class="setting"><div>Camera zoom<small>Tesla wide recommended</small></div><select id="zoom-setting"><option value="wide">Tesla wide</option><option value="far">Far ahead</option><option value="near">Near</option></select></div>
+    <div class="setting"><div>Automatic Free Ride<small>Begins after stable GPS movement</small></div><input type="checkbox" id="autoride-setting" checked style="width:20px;height:20px;accent-color:#409bff"></div>
+    <div class="setting"><div>Reset trip meter</div><button class="ghost" id="reset-trip">RESET</button></div>
+    <div class="setting"><div>Minimum mapped road width<small>Only where tagged in OpenStreetMap</small></div><input id="width-setting" type="number" min="1.5" max="5" step="0.1" value="2.2"></div>
+    <button class="primary" id="save-settings" style="width:100%;margin-top:17px">SAVE SETTINGS</button>
+  </div></div>
+
+<script>
+'use strict';
+(() => {
+const $ = id => document.getElementById(id);
+const STORAGE = 'emoto_free_roadfirst_v7';
+function readJSON(key){try{return JSON.parse(localStorage.getItem(key)||'null')||null}catch(_){return null}}
+const prior = readJSON(STORAGE) || readJSON('emoto_google_tesla_v6') || {};
+const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
+const state={
+  gps:null,prevGps:null,gpsWatch:null,map:null,marker:null,pin:null,layers:[],selected:0,
+  routes:prior.route&&Array.isArray(prior.route.points)?[{...prior.route,audit:'unknown',blocked:false}]:[],routeReady:!!prior.route,
+  resumeRide:!!prior.riding && (Date.now()-(prior.savedAt||0)<3600000),resumeMode:prior.mode||'free',
+  dest:prior.dest||'',destPoint:prior.destPoint||null,requestId:0,searchId:0,
+  riding:false,mode:'free',autoRide:prior.autoRide!==false,muted:!!prior.muted,
+  batteryStart:clamp(Number.isFinite(+prior.batteryStart)?+prior.batteryStart:100,0,100),
+  fullRange:Math.max(1,+prior.fullRange||35),tripM:Math.max(0,+prior.tripM||0),
+  bikeWidth:Math.max(1.5,+prior.bikeWidth||2.2),zoom:prior.zoomStyle||'wide',
+  speedKph:0,heading:null,progress:0,nextTurn:0,voiceMarks:new Set(),moveCount:0,
+  lastSave:0,lastCamera:0,lastReroute:0,offRouteCount:0,overviewUntil:0,
+  geocoding:false,safetyBusy:false,routingBusy:false,lastLocationAt:0,
+  offRouteSince:0
+};
+const colors=['#2289ff','#63b5ff','#93a2c1','#8b82ee'];
+function num(n,p=1){return (Math.round(n*10**p)/10**p).toFixed(p)}
+function fmtKm(m){return `${num(m/1000,m<10000?1:0)} km`}
+function fmtMin(sec){return `${Math.max(1,Math.round(sec/60))} min`}
+function safeHTML(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function meters(a,b){if(!a||!b)return Infinity;let p=a.lat*Math.PI/180,q=b.lat*Math.PI/180,d=(b.lat-a.lat)*Math.PI/180,e=(b.lng-a.lng)*Math.PI/180;return 12742000*Math.asin(Math.min(1,Math.sqrt(Math.sin(d/2)**2+Math.cos(p)*Math.cos(q)*Math.sin(e/2)**2)))}
+function bearing(a,b){const x=a.lat*Math.PI/180,y=b.lat*Math.PI/180,z=(b.lng-a.lng)*Math.PI/180;return (Math.atan2(Math.sin(z)*Math.cos(y),Math.cos(x)*Math.sin(y)-Math.sin(x)*Math.cos(y)*Math.cos(z))*180/Math.PI+360)%360}
+function ahead(p,deg,dist){let r=6378137,x=deg*Math.PI/180,d=dist/r,a=p.lat*Math.PI/180,b=p.lng*Math.PI/180,c=Math.asin(Math.sin(a)*Math.cos(d)+Math.cos(a)*Math.sin(d)*Math.cos(x)),e=b+Math.atan2(Math.sin(x)*Math.sin(d)*Math.cos(a),Math.cos(d)-Math.sin(a)*Math.sin(c));return{lat:c*180/Math.PI,lng:e*180/Math.PI}}
+function routeMeters(route){if(!route||!route.points)return 0;return route.distance||route.points.reduce((n,p,i)=>n+(i?meters(route.points[i-1],p):0),0)}
+function battery(){return Math.max(0,state.batteryStart-state.tripM/(state.fullRange*1000)*100)}
+function toast(msg,ms=2800){const el=$('toast');el.textContent=msg;el.style.display='block';clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.style.display='none',ms)}
+function status(msg){$('status').textContent=msg}
+function speak(text,urgent=false){if(state.muted||!text||!window.speechSynthesis)return;try{if(urgent)speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='en-PH';u.rate=1.02;speechSynthesis.speak(u)}catch(_){}}
+function save(force=false){const now=Date.now();if(!force&&now-state.lastSave<7000)return;state.lastSave=now;
+ try{const route=state.routes[state.selected];localStorage.setItem(STORAGE,JSON.stringify({dest:state.dest,destPoint:state.destPoint,route:route?{...route,points:route.points.map(p=>({lat:+p.lat.toFixed(5),lng:+p.lng.toFixed(5)}))}:null,batteryStart:state.batteryStart,fullRange:state.fullRange,tripM:state.tripM,autoRide:state.autoRide,muted:state.muted,zoomStyle:state.zoom,bikeWidth:state.bikeWidth,riding:state.riding,mode:state.mode,savedAt:Date.now()}));}catch(_){}}
+function dash(){const b=battery();$('speed').textContent=Math.round(state.speedKph);$('battery').textContent=`${Math.round(b)}%`;$('range').textContent=`${num(b/100*state.fullRange)} km`;$('trip').textContent=`${num(state.tripM/1000)} km`;}
+function initMap(){state.map=L.map('free-map',{zoomControl:false,preferCanvas:true,zoomSnap:.25,zoomDelta:.5}).setView([14.6,121.17],15.5);
+ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>'}).addTo(state.map);
+ state.map.on('click',e=>{if(state.riding)return;setDestination({lat:e.latlng.lat,lng:e.latlng.lng},'Pinned on map');toast('Pin selected • Tap FIND ROUTES');});
+ if(state.destPoint)addPin(state.destPoint);
+ redrawRoutes();
+}
+function addPin(p){if(state.pin)state.map.removeLayer(state.pin);state.pin=L.circleMarker([p.lat,p.lng],{radius:9,color:'#fff',weight:3,fillColor:'#ff5268',fillOpacity:1}).addTo(state.map).bindTooltip('Destination',{direction:'top'});}
+function setDestination(p,name){state.destPoint=p;state.dest=name;$('destination').value=name;clearRoutes(false);addPin(p);save(true);}
+function clearRoutes(clearDest=false){state.requestId++;state.routes=[];state.selected=0;state.progress=0;state.nextTurn=0;state.voiceMarks.clear();state.offRouteCount=0;state.overviewUntil=0;state.routingBusy=false;
+ for(const layer of state.layers)state.map.removeLayer(layer);state.layers=[];
+ if(clearDest){state.dest='';state.destPoint=null;$('destination').value='';if(state.pin){state.map.removeLayer(state.pin);state.pin=null;}}
+ $('route-options').replaceChildren();$('route-options').style.display='none';$('summary-title').textContent='Free Ride Ready';$('summary-desc').textContent='No route • GPS and battery tracking available';status('BIKE • AVOID TOLL • ROAD FIRST');save(true);
+}
+function chooseRoute(index){if(!state.routes[index]||state.routes[index].blocked)return;state.selected=index;state.nextTurn=0;state.progress=0;state.voiceMarks.clear();redrawRoutes();drawChoices();const r=state.routes[index];
+ $('summary-title').textContent=fmtMin(r.duration);$('summary-desc').textContent=`${fmtKm(r.distance)} • ${r.label} • ${r.audit==='checked'?'Width spot-checked':'Width not verified'}`;
+ save(true);}
+function redrawRoutes(){if(!state.map)return;for(const l of state.layers)state.map.removeLayer(l);state.layers=[];
+ state.routes.forEach((r,i)=>{if(!r.points?.length)return;const selected=(i===state.selected);let style={color:selected?'#1260cf':'#8b9db4',weight:selected?9:6,opacity:selected?1:.58};const under=L.polyline(r.points,{color:selected?'#fff':'#fff',weight:style.weight+4,opacity:selected?.93:.4,interactive:false}).addTo(state.map);const line=L.polyline(r.points,{...style,interactive:true}).addTo(state.map);if(selected){under.bringToFront();line.bringToFront()}else{under.bringToBack();line.bringToBack()}line.on('click',()=>chooseRoute(i));state.layers.push(under,line)});
+}
+function routeBounds(){const r=state.routes[state.selected];if(r?.points.length)state.map.fitBounds(L.latLngBounds(r.points.map(p=>[p.lat,p.lng])),{padding:[48,55],maxZoom:15.5,animate:false})}
+function drawChoices(){const wrap=$('route-options');wrap.replaceChildren();if(!state.routes.length){wrap.style.display='none';return;}wrap.style.display='flex';
+ state.routes.forEach((r,i)=>{const b=document.createElement('button');b.type='button';b.className=`route-option ${i===state.selected?'selected':''}`;b.disabled=!!r.blocked;
+ let audit=r.blocked?'REJECTED • narrow/path risk':r.audit==='checked'?'No known narrow tag at sampled points':r.audit==='unknown'?'Width tags could not be checked':'Width tags not verified';
+ b.innerHTML=`<div class="option-main"><div class="option-title">${safeHTML(r.label)} ${r.blocked?'⛔':''}</div><div class="option-sub">${safeHTML(fmtKm(r.distance))} • ${safeHTML(audit)}</div></div><div class="option-eta">${safeHTML(fmtMin(r.duration))}</div>`;
+ b.addEventListener('click',()=>chooseRoute(i));wrap.appendChild(b)});
+}
+function classifyStep(step){const m=step?.maneuver||{};const type=(m.type||'').toLowerCase(),mod=(m.modifier||'').toLowerCase();if(type==='arrive')return['flag','Arrive at destination'];if(type==='depart')return['straight','Head out'];if(type==='roundabout'||type==='rotary')return['roundabout_right','Take the roundabout'];if(type==='uturn'||mod.includes('uturn'))return['u_turn_left','Make a U-turn'];if(mod.includes('left'))return['turn_left',`Turn ${mod.replace(/_/g,' ')}`];if(mod.includes('right'))return['turn_right',`Turn ${mod.replace(/_/g,' ')}`];if(type==='merge')return['merge','Merge'];return['straight','Continue straight']}
+function mapRoute(raw,label,source){const points=(raw.geometry?.coordinates||[]).map(c=>({lat:c[1],lng:c[0]})).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng));if(points.length<2)throw Error('Invalid route geometry');let steps=(raw.legs||[]).flatMap(l=>l.steps||[]).map(s=>{let ll=s.maneuver?.location;return{...s,location:ll?{lat:ll[1],lng:ll[0]}:null}});return{points,distance:raw.distance,duration:raw.duration,steps,label,source,audit:'pending',blocked:false};}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function requestJSON(url,options={},ms=15000){const ctrl=new AbortController();const timeout=setTimeout(()=>ctrl.abort(),ms);try{const response=await fetch(url,{...options,signal:ctrl.signal});if(!response.ok)throw Error(`HTTP ${response.status}`);const j=await response.json();if(!j)throw Error('Empty response');return j}finally{clearTimeout(timeout)}}
+async function valhalla(pos,dest,useRoads=.78,alternate=2){const payload={locations:[{lat:pos.lat,lon:pos.lng},{lat:dest.lat,lon:dest.lng}],costing:'bicycle',costing_options:{bicycle:{bicycle_type:'road',use_roads:useRoads,avoid_bad_surfaces:1,alley_penalty:1200,service_penalty:350,use_hills:0.3,use_ferry:0}},format:'osrm',shape_format:'geojson',alternates:alternate,directions_options:{language:'en-US',units:'kilometers'}};
+ const url=`https://valhalla1.openstreetmap.de/route?json=${encodeURIComponent(JSON.stringify(payload))}`;
+ const json=await requestJSON(url,{},21000);if(!Array.isArray(json.routes)||!json.routes.length)throw Error(json.error||'No Valhalla route');return json.routes.map((r,i)=>mapRoute(r,useRoads>=.7?(i?'Road-first alternate':'Road-first Bike'):(i?'Bike-lane alternate':'Bike-friendly Route'),'valhalla'));}
+async function osrmBike(pos,dest){const url=`https://routing.openstreetmap.de/routed-bike/route/v1/driving/${pos.lng.toFixed(6)},${pos.lat.toFixed(6)};${dest.lng.toFixed(6)},${dest.lat.toFixed(6)}?alternatives=2&steps=true&overview=full&geometries=geojson`;
+ const data=await requestJSON(url,{},19000);if(data.code!=='Ok'||!data.routes?.length)throw Error(data.message||'No bicycle route');return data.routes.map((r,i)=>mapRoute(r,i?'Bike Route Alternate':'Bike Route • Backup','osrm'));}
+function uniqueRoutes(routes){const out=[];for(const r of routes){const shape=[r.points[Math.floor(r.points.length*.24)],r.points[Math.floor(r.points.length*.5)],r.points[Math.floor(r.points.length*.76)]];if(out.some(s=>Math.abs(s.distance-r.distance)<150 && shape.every((p,i)=>meters(p,s.points[Math.floor(s.points.length*([.24,.5,.76][i]))])<110)))continue;out.push(r)}return out.slice(0,4)}
+function sampleRoute(r,max=24){const pts=r.points;if(pts.length<=max)return pts;const samples=[];for(let i=1;i<=max;i++)samples.push(pts[Math.floor((pts.length-1)*i/(max+1))]);return samples}
+function waysNearSegment(point,a,b){const rad=Math.PI/180,mLat=111200,mLon=111200*Math.cos(point.lat*rad),ax=(a.lng-point.lng)*mLon,ay=(a.lat-point.lat)*mLat,bx=(b.lng-point.lng)*mLon,by=(b.lat-point.lat)*mLat,dx=bx-ax,dy=by-ay,t=clamp(-(ax*dx+ay*dy)/(dx*dx+dy*dy||1),0,1);return Math.hypot(ax+t*dx,ay+t*dy)}
+function pathHazard(tags){const road=tags.highway||'',service=tags.service||'',type=tags.access||'',toll=tags.toll||'';if(/^(motorway|motorway_link|trunk|trunk_link|steps|footway|pedestrian)$/.test(road))return 'restricted road or footpath';if(road==='path'||road==='bridleway')return 'narrow/uncertain path';if(road==='service'&&['alley','driveway','parking_aisle'].includes(service))return 'alley/driveway';if(['private','no'].includes(type))return 'restricted access';if(toll==='yes')return 'toll road';
+ const parsed=v=>{if(!v)return NaN;let s=String(v).toLowerCase();const n=parseFloat(s.replace(',','.'));if(!Number.isFinite(n))return NaN;return /ft|feet|\'/.test(s)?n*.3048:n};
+ const width=[parsed(tags.width),parsed(tags.maxwidth),parsed(tags.est_width)].filter(Number.isFinite);if(width.length&&Math.min(...width)<state.bikeWidth)return 'tagged narrow width';
+ if(road==='cycleway' && (!width.length||Math.min(...width)<state.bikeWidth))return 'unverified/narrow cycleway';return null;}
+function maybeHazardOnRoute(r,ways){let warnings=[];for(const w of ways){const reason=pathHazard(w.tags||{});if(!reason||!w.geometry?.length)continue;const geo=w.geometry.map(g=>({lat:g.lat,lng:g.lon??g.lng}));const points=sampleRoute(r,Math.min(70,Math.max(24,Math.round(r.points.length/20))));let near=false;
+ for(const p of points){for(let k=1;k<geo.length;k++){if(waysNearSegment(p,geo[k-1],geo[k])<6){near=true;break;}}if(near)break}if(near){warnings.push(reason);if(warnings.length>=4)break;}}
+ return warnings;}
+async function spotCheckWays(routes,token){ // best-effort map-data safety screening: route segment sampling, not a surveyed width check
+ const locations=[];for(const r of routes.slice(0,3)){locations.push(...sampleRoute(r,20))}const samples=[];for(const p of locations){if(!samples.some(s=>meters(s,p)<90))samples.push(p)}
+ if(!samples.length)return;
+ const query='[out:json][timeout:22];('+samples.slice(0,52).map(p=>`way(around:15,${p.lat.toFixed(5)},${p.lng.toFixed(5)})[highway];`).join('')+');out tags geom;';
+ try{let data=null;const params={method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'data='+encodeURIComponent(query)};
+ for(const server of ['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter']){try{data=await requestJSON(server,params,11500);break}catch(_){}}
+ if(!data)throw Error('OSM width tag check unavailable');if(token!==state.requestId)return;
+ const ways=(data.elements||[]).filter(e=>e.type==='way'&&e.tags&&e.geometry);
+ if(!ways.length)throw Error('No tagged roads returned');
+ for(const r of routes){const warnings=maybeHazardOnRoute(r,ways);r.audit='checked';r.blocked=warnings.length>0;r.warnings=warnings;}
+ }catch(_){for(const r of routes){r.audit='unknown';r.blocked=false;}}
+}
+async function findRoutes(options={}){
+ if(state.routingBusy)return;
+ if(!state.gps){toast('Waiting for GPS. Enable precise location & HTTPS.');return;}
+ if(!state.destPoint){await geocodePlace();return;}
+ const token=++state.requestId;state.routingBusy=true;status('Finding road-first bicycle routes...');$('find-route').disabled=true;toast('Finding routes • no API key needed');
+ try{
+   let candidates=[];let mainError=null;
+   try{candidates.push(...await valhalla(state.gps,state.destPoint,.78,2))}catch(e){mainError=e}
+   if(token!==state.requestId)return;
+   if(!options.quick && candidates.length<3){await sleep(1150);try{candidates.push(...await valhalla(state.gps,state.destPoint,.48,1))}catch(e){mainError ||= e}}
+   if(token!==state.requestId)return;
+   if(!candidates.length){try{candidates.push(...await osrmBike(state.gps,state.destPoint))}catch(e){mainError ||= e}}
+   if(token!==state.requestId)return;
+   candidates=uniqueRoutes(candidates);
+   if(!candidates.length)throw Error(mainError?.message||'No accessible bicycle route');
+   state.routes=candidates;state.selected=0;state.safetyBusy=true;redrawRoutes();drawChoices();routeBounds();
+   status('Checking mapped narrow roads...');
+   if(!options.quick)await spotCheckWays(candidates,token);else candidates.forEach(r=>r.audit='unknown');
+   if(token!==state.requestId)return;
+   state.safetyBusy=false;
+   let first=candidates.findIndex(r=>!r.blocked);
+   if(first<0){state.selected=0;redrawRoutes();drawChoices();$('summary-title').textContent='NO SUITABLE ROUTE';$('summary-desc').textContent='Mapped path/width hazard detected. Free Ride remains available.';toast('No unflagged route found. Check local road conditions.',5000);status('ROUTE FLAGGED • DO NOT FOLLOW');return}
+   state.selected=first;chooseRoute(first);
+   status(candidates.some(r=>r.audit==='unknown')?'BIKE ROUTE • WIDTH NOT VERIFIED':'BIKE ROUTE • KNOWN NARROW TAGS SCREENED');
+   if(candidates.length>1)toast(`${candidates.filter(r=>!r.blocked).length} route option(s). Choose before starting.`);else toast('Bike route ready • review the road before riding');
+ }catch(err){if(token!==state.requestId)return;status('Route server unavailable • Free Ride works');toast('No route found: '+String(err?.message||'Server unavailable').slice(0,95),4600)}
+ finally{if(token===state.requestId){state.routingBusy=false;state.safetyBusy=false;$('find-route').disabled=false;save(true)}}
+}
+async function geocodePlace(){if(state.geocoding)return;const query=$('destination').value.trim();if(query.length<3){toast('Type a place or pin a point on the map');return}let lonlat=query.match(/^\s*(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)\s*$/);if(lonlat){const p={lat:+lonlat[1],lng:+lonlat[2]};if(Math.abs(p.lat)<=90&&Math.abs(p.lng)<=180){setDestination(p,query);findRoutes();return;}}
+ const serial=++state.searchId;state.geocoding=true;status('Searching places...');
+ try{const bias=state.gps?`&lat=${state.gps.lat}&lon=${state.gps.lng}`:'';
+ let j=await requestJSON(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=6${bias}`,{},15000);if(serial!==state.searchId)return;
+ const list=(j.features||[]).filter(f=>f.geometry?.coordinates?.length===2);if(!list.length){toast('No place found. Tap the map to pin the destination.');return}
+ const box=$('place-results');box.replaceChildren();box.style.display='block';for(const f of list){let pr=f.properties||{},p={lat:f.geometry.coordinates[1],lng:f.geometry.coordinates[0]},name=[pr.name||pr.street||'Place',pr.city||pr.county||'',pr.state||''].filter(Boolean).join(', ');
+ const btn=document.createElement('button');btn.className='place-result';btn.textContent=name;btn.addEventListener('click',()=>{box.style.display='none';setDestination(p,name);findRoutes()});box.appendChild(btn)}toast('Choose the correct place from search results.');
+ }catch(e){toast('Place search unavailable. Tap map to pin.')}finally{state.geocoding=false;status('BIKE • AVOID TOLL • ROAD FIRST')}
+}
+function beginRide(forceFree=false,silent=false){if(state.riding)return;if(!state.gps){toast('Allow GPS first');return}if(state.safetyBusy&&!forceFree){toast('Wait for narrow-road check, or choose Free Ride.',4000);return}
+ state.mode=!forceFree&&state.routes[state.selected]&&!state.routes[state.selected].blocked?'route':'free';state.riding=true;state.moveCount=0;state.prevGps=state.gps;state.nextTurn=0;state.voiceMarks.clear();state.offRouteCount=0;state.overviewUntil=0;
+ document.body.classList.add('riding');$('nav-label').textContent=state.mode==='route'?'NEXT TURN':'FREE RIDE';$('turn-heading').textContent=state.mode==='route'?'Follow your route':'Free Ride';$('turn-road').textContent=state.mode==='route'?'Voice guidance active':'No destination • GPS tracking';$('turn-icon').textContent='navigation';
+ if(!silent)speak(state.mode==='route'?'Bike road-first navigation started. Verify road width, signs and access before following.':'Free ride started.');follow(true);updateProgress();save(true);
+}
+function endRide(){if(!state.riding)return;state.riding=false;state.mode='free';document.body.classList.remove('riding');state.moveCount=0;speak('Ride ended.',true);save(true);follow(true)}
+function onGPS(position){const c=position.coords;const gps={lat:c.latitude,lng:c.longitude},now=Date.now(),accuracy=c.accuracy||999;
+ if(accuracy>130&&!state.gps)return;
+ const prev=state.gps;const dt=(now-state.lastLocationAt)/1000;
+ if(prev&&dt>0){const dx=meters(prev,gps);if(accuracy>100&&dx<accuracy)return;if(dx>Math.max(100,dt*31) && dt<20)return;}
+ state.gps=gps;state.lastLocationAt=now;const delta=prev&&dt>=1.5?meters(prev,gps):0;
+ const inferredSpeed=accuracy<=35&&dt>=1.5&&delta>Math.max(9,accuracy*.85)&&delta<Math.min(130,dt*20)?delta/dt*3.6:0;
+ const gpsSpeed=Number.isFinite(c.speed)&&c.speed>=0?c.speed*3.6:0;const newSpeed=Math.max(gpsSpeed,inferredSpeed);state.speedKph=newSpeed;
+ if(Number.isFinite(c.heading)&&c.heading>=0)state.heading=c.heading;
+ if(!state.marker){state.marker=L.marker([gps.lat,gps.lng],{icon:L.divIcon({className:'',html:'<div class="gps-arrow"><i class="mi">navigation</i></div>',iconSize:[42,42],iconAnchor:[21,21]})}).addTo(state.map)}else state.marker.setLatLng([gps.lat,gps.lng]);
+ if(state.marker){const m=state.marker.getElement();const arrow=m?.querySelector('.gps-arrow');if(arrow)arrow.style.transform=`rotate(${state.heading||0}deg)`}
+ $('accuracy').textContent=`${Math.round(accuracy)} m`;
+ if(state.riding&&prev&&dt>0&&accuracy<55){const d=meters(prev,gps);if(d>3&&d<Math.min(120,dt*20+15)&&(newSpeed>1.5||d/dt>1.5)){state.tripM+=d;save();}}
+ if(!state.riding&&state.autoRide&&!state.safetyBusy&&accuracy<35 && newSpeed>5){state.moveCount++;if(state.moveCount>=3)beginRide(!state.routes.some(r=>!r.blocked),false)}else if(!state.riding)state.moveCount=0;
+ dash();if(!state.riding&&state.resumeRide){const free=state.resumeMode!=='route';state.resumeRide=false;beginRide(free,true);toast('Previous ride restored');}
+ if(state.riding){updateProgress();follow();}else if(!prev)follow(true);
+}
+function startGPS(){if(!navigator.geolocation){status('GPS not supported');toast('Your browser does not support geolocation');return}
+ status('Waiting for GPS permission...');state.gpsWatch=navigator.geolocation.watchPosition(p=>{onGPS(p);if(state.gps&&$('status').textContent.includes('Waiting'))status('GPS ready • bike routing available')},err=>{status('Enable GPS & HTTPS • Free Ride needs location');if(err.code===1)toast('Location permission denied. Enable GPS for this site.',4000)}, {enableHighAccuracy:true,maximumAge:1500,timeout:18000});
+}
+function nearestOnRoute(r,pt){let bestD=Infinity,best=0;const step=Math.max(1,Math.floor(r.points.length/700));for(let i=0;i<r.points.length;i+=step){const d=meters(pt,r.points[i]);if(d<bestD){bestD=d;best=i}}return{index:best,distance:bestD};}
+function updateProgress(){if(!state.riding||!state.gps)return;
+ if(state.mode!=='route'){$('eta').textContent='—';$('remaining-time').textContent='FREE';$('remaining-dist').textContent=fmtKm(state.tripM);return;}
+ const r=state.routes[state.selected];if(!r?.points?.length)return;
+ const closest=nearestOnRoute(r,state.gps),idx=closest.index;
+ let remaining=0;for(let i=idx+1;i<r.points.length;i++)remaining+=meters(r.points[i-1],r.points[i]);
+ state.progress=Math.max(0,Math.min(1,1-remaining/(r.distance||1)));
+ const seconds=r.duration*Math.max(0,1-state.progress);$('eta').textContent=new Date(Date.now()+seconds*1000).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});$('remaining-time').textContent=fmtMin(seconds);$('remaining-dist').textContent=fmtKm(remaining);
+ const steps=r.steps||[];
+ if(steps.length){let next=steps.findIndex((s,i)=>i>=state.nextTurn && s.location && meters(s.location,state.gps)>30);if(next<0)next=Math.max(0,steps.length-1);state.nextTurn=next;const s=steps[next],m=s.maneuver||{},instruction=classifyStep(s),d=s.location?meters(state.gps,s.location):Infinity;
+ $('turn-icon').textContent=instruction[0];$('turn-heading').textContent=d<400?instruction[1]:`In ${Math.round(d/50)*50} m`;
+ $('turn-road').textContent=`${instruction[1]}${s.name?' onto '+s.name:''} • ${Math.round(d)} m`;
+ const thresholds=[350,120,35];for(const t of thresholds){const key=`${next}-${t}`;if(d<t&&!state.voiceMarks.has(key)){state.voiceMarks.add(key);speak(t<=35?`${instruction[1]}${s.name?' onto '+s.name:''}`:`In ${Math.round(d/10)*10} meters, ${instruction[1]}${s.name?' onto '+s.name:''}`);break;}}
+ }
+ if(remaining<35){speak('You have arrived at your destination.',true);endRide();return;}
+ if(closest.distance>65){state.offRouteCount++;if(state.offRouteCount>=4&&Date.now()-state.lastReroute>35000){state.lastReroute=Date.now();state.offRouteCount=0;toast('Off route • Recalculating bike route...');speak('Off route. Recalculating.',true);reroute()}}else state.offRouteCount=0;
+}
+async function reroute(){if(state.routingBusy||!state.destPoint||!state.gps)return;const keepRiding=state.riding;const previous=state.routes[state.selected];const token=++state.requestId;state.routingBusy=true;
+ try{const routes=previous.source==='osrm'?await osrmBike(state.gps,state.destPoint):await valhalla(state.gps,state.destPoint,previous.label.includes('Bike-friendly')?.48:.78,0);
+ if(token!==state.requestId)return;const r=routes[0];r.audit='unknown'; // no instant width verification on an emergency reroute
+ state.routes=[r];state.selected=0;state.nextTurn=0;state.voiceMarks.clear();redrawRoutes();drawChoices();toast('New bike route • width not rechecked');speak('New route is ready.',true);
+ if(keepRiding)state.mode='route';save(true);
+ }catch(_){toast('Could not recalculate. Pull over and review the map.',4500)}finally{if(token===state.requestId)state.routingBusy=false}}
+function follow(force=false){if(!state.map||!state.gps)return;const now=Date.now();if(!force&&(now<state.overviewUntil||now-state.lastCamera<1700))return;state.lastCamera=now;
+ const zoomBy={near:17.1,wide:16.2,far:15.6};let z=state.riding?zoomBy[state.zoom]||16.2:15.8;
+ if(state.riding&&state.speedKph>45)z-=.4;
+ let focused=state.gps;
+ if(state.riding){let roadHead=state.heading;const r=state.routes[state.selected];if(state.mode==='route'&&r?.points?.length){const x=nearestOnRoute(r,state.gps).index;roadHead=bearing(r.points[x],r.points[Math.min(r.points.length-1,x+6)]);}if(!Number.isFinite(roadHead))roadHead=0;focused=ahead(state.gps,roadHead,state.mode==='route'?Math.min(220,85+state.speedKph*2.5):55)}
+ state.map.setView([focused.lat,focused.lng],z,{animate:false});}
+function overview(){const r=state.routes[state.selected];if(!r){follow(true);return}state.overviewUntil=Date.now()+9000;routeBounds();toast('Full route • returns to follow in 9 sec')}
+function bind(){
+ $('destination').value=state.dest;$('battery-setting').value=state.batteryStart;$('range-setting').value=state.fullRange;$('autoride-setting').checked=state.autoRide;$('width-setting').value=state.bikeWidth;$('zoom-setting').value=state.zoom;$('audio-icon').textContent=state.muted?'volume_off':'volume_up';dash();
+ $('destination').addEventListener('input',()=>{state.searchId++;$('place-results').style.display='none';state.dest=$('destination').value;state.destPoint=null;clearRoutes(false);if(state.pin){state.map.removeLayer(state.pin);state.pin=null;}save(true)});
+ $('destination').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();findRoutes()}});
+ $('find-route').addEventListener('click',()=>findRoutes());
+ $('clear-destination').addEventListener('click',()=>{if(state.riding)endRide();clearRoutes(true);$('place-results').style.display='none';toast('Destination cleared • Free Ride ready')});
+ $('free-ride').addEventListener('click',()=>{clearRoutes(false);beginRide(true)});
+ $('start-ride').addEventListener('click',()=>beginRide(!state.routes.length||state.routes.every(r=>r.blocked)));
+ $('end-ride').addEventListener('click',endRide);
+ $('recenter').addEventListener('click',()=>{state.overviewUntil=0;follow(true)});$('overview').addEventListener('click',overview);
+ $('settings-btn').addEventListener('click',()=>{$('settings-sheet').classList.add('open')});$('close-settings').addEventListener('click',()=>{$('settings-sheet').classList.remove('open')});
+ $('settings-sheet').addEventListener('click',e=>{if(e.target===$('settings-sheet'))$('settings-sheet').classList.remove('open')});
+ $('audio-btn').addEventListener('click',()=>{state.muted=!state.muted;if(state.muted&&window.speechSynthesis)speechSynthesis.cancel();$('audio-icon').textContent=state.muted?'volume_off':'volume_up';save(true)});
+ $('save-settings').addEventListener('click',()=>{const oldWidth=state.bikeWidth;state.batteryStart=clamp(+$('battery-setting').value||0,0,100);state.fullRange=Math.max(1,+$('range-setting').value||35);state.bikeWidth=Math.max(1.5,+$('width-setting').value||2.2);state.zoom=$('zoom-setting').value;state.autoRide=$('autoride-setting').checked;const widthChanged=Math.abs(oldWidth-state.bikeWidth)>.05&&state.routes.length;if(widthChanged)clearRoutes(false);dash();save(true);$('settings-sheet').classList.remove('open');toast(widthChanged?'Width changed • Tap FIND ROUTES again':'Settings saved',widthChanged?4000:2800);});
+ $('reset-trip').addEventListener('click',()=>{state.batteryStart=battery();state.tripM=0;$('battery-setting').value=state.batteryStart;dash();save(true);toast('Trip meter reset')});
+ document.addEventListener('visibilitychange',()=>{save(true);if(document.visibilityState==='visible'){state.map.invalidateSize();follow(true)}});window.addEventListener('pagehide',()=>save(true));
+}
+initMap();bind();startGPS();
+if(state.routes.length){state.selected=0;redrawRoutes();drawChoices();chooseRoute(0);status('Saved bike route restored • Verify road conditions');}
+})();
+
+</script>
 </body>
 </html>
