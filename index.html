@@ -46,6 +46,8 @@
     .trip-summary{min-width:0;flex:1;padding-left:5px}.trip-summary b{display:block;font-size:16px;line-height:1.35}.trip-summary span{display:block;font-size:10px;color:#abc1d7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:4px}
     .start{border-radius:12px;background:#277ae9;color:#fff;font-size:12px;font-weight:900;padding:13px 15px;white-space:nowrap}
     .recenter{position:absolute;bottom:calc(310px + env(safe-area-inset-bottom));right:14px}.status{position:absolute;top:calc(78px + env(safe-area-inset-top));right:14px;max-width:190px;padding:8px 10px;border-radius:10px;font-size:10px;font-weight:800;background:rgba(17,23,34,.8);border:1px solid #fff2;color:#f4c787;text-align:center}
+    #status{cursor:pointer;line-height:1.4;min-height:34px;touch-action:manipulation}
+    #status.gps-alert{color:#ffe0a2;background:rgba(75,34,26,.9);border-color:rgba(255,196,106,.55)}
     .nav-header{display:none;position:absolute;top:calc(13px + env(safe-area-inset-top));left:14px;width:min(420px,calc(100vw - 28px));padding:17px}
     .next-label{text-transform:uppercase;color:#9eb9d1;font-size:10px;font-weight:900;letter-spacing:1.7px}.next-turn{display:flex;align-items:center;gap:13px;margin-top:5px}.next-turn .mi{font-size:41px;color:#8ac6ff}.turn-main{font-size:23px;line-height:1.1;font-weight:800;max-width:285px}.turn-minor{font-size:11px;color:#b6cadd;margin-top:7px}
     .nav-footer{display:none;position:absolute;bottom:calc(13px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:min(570px,calc(100vw - 26px));padding:14px 15px;align-items:center;gap:12px}
@@ -54,7 +56,7 @@
     body.riding .nav-header,body.riding .nav-footer{display:flex}
     body.riding .dashboard{bottom:calc(105px + env(safe-area-inset-bottom));width:155px;padding:10px}
     body.riding .speed{font-size:44px;letter-spacing:-3px}body.riding .dashboard .dash-title,body.riding .dashboard .speed-unit{display:none}body.riding .dash-cell{padding:7px 5px}body.riding .dash-cell strong{font-size:12px}
-    body.riding .recenter{bottom:calc(265px + env(safe-area-inset-bottom))}body.riding .status{display:none}
+    body.riding .recenter{bottom:calc(265px + env(safe-area-inset-bottom))}body.riding .status:not(.gps-alert){display:none}
     .toast{position:fixed;z-index:30;top:48%;left:50%;transform:translate(-50%,-50%);padding:13px 17px;border-radius:13px;color:#fff;background:#172231e9;box-shadow:var(--shadow);max-width:min(360px,90vw);text-align:center;font-size:12px;line-height:1.55;font-weight:700;display:none;pointer-events:none}
     .scrim{position:fixed;inset:0;z-index:50;background:#080c13be;display:grid;place-items:center;padding:15px}.setup{width:min(490px,100%);background:#111b28;border:1px solid #ffffff24;border-radius:25px;box-shadow:0 25px 60px #0009;padding:25px;color:white;max-height:94vh;overflow-y:auto}.setup-icon{width:47px;height:47px;border-radius:14px;background:#16395a;display:grid;place-items:center;color:#8bc9ff}.setup h1{font-size:23px;line-height:1.25;margin:17px 0 9px}.setup p{color:#b5c7d8;line-height:1.6;font-size:12px;margin:0 0 14px}.setup label{display:block;color:#d4e3f2;font-size:11px;font-weight:800;margin:15px 0 7px}.setup input{width:100%;background:#0b121c;border:1px solid #41546a;border-radius:12px;color:white;font:600 13px Inter,sans-serif;padding:13px}.setup .primary{width:100%;padding:14px;margin-top:12px}.setup a{color:#95caff}.disclaimer{font-size:11px;line-height:1.65;border-left:3px solid #ffbd62;padding:10px 13px;background:#ffffff09;border-radius:5px;color:#d8e3ee}.error-note{color:#ffb7ac;font-size:11px;min-height:14px;margin-top:7px}
     .sheet{display:none;position:fixed;z-index:40;inset:0;background:#070c13a4;align-items:center;justify-content:center;padding:16px}.sheet.open{display:flex}.sheet-panel{width:min(430px,100%);padding:20px;background:#142030;border:1px solid #ffffff20;border-radius:22px;box-shadow:var(--shadow)}.sheet-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:15px;font-weight:900}.setting{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;font-size:12px;border-bottom:1px solid #ffffff13}.setting input{width:75px;border:1px solid #ffffff35;border-radius:9px;background:#090f18;color:white;padding:10px;font-size:12px}.setting small{display:block;color:#aac1d7;margin-top:3px}.setting select{color:white;background:#090f18;border:1px solid #ffffff35;padding:10px;border-radius:8px}
@@ -82,7 +84,7 @@
     </section>
     <div class="route-options" id="route-options" aria-label="Route options"></div>
     <div class="place-results glass" id="place-results" aria-label="Search results"></div>
-    <div class="status" id="status">Waiting for GPS</div>
+    <button type="button" class="status gps-alert" id="status" title="Tap to retry GPS" aria-live="polite">Locating GPS... Tap to retry</button>
     <section class="dashboard glass" aria-label="Trip dashboard">
       <div class="dash-title">LIVE E-BIKE <i class="mi" style="font-size:16px;color:#8fc7ff">speed</i></div>
       <div class="speed" id="speed">0</div><div class="speed-unit">KM / H</div>
@@ -128,7 +130,7 @@ const state={
   speedKph:0,heading:null,headingAt:0,progress:0,nextTurn:0,voiceMarks:new Set(),moveCount:0,
   lastSave:0,lastCamera:0,lastReroute:0,offRouteCount:0,overviewUntil:0,
   geocoding:false,safetyBusy:false,routingBusy:false,lastLocationAt:0,
-  offRouteSince:0
+  offRouteSince:0,gpsRequestId:0,gpsWatchdog:null,gpsError:'',lastAccuracy:Infinity
 };
 const colors=['#2289ff','#63b5ff','#93a2c1','#8b82ee'];
 function num(n,p=1){return (Math.round(n*10**p)/10**p).toFixed(p)}
@@ -142,7 +144,12 @@ function ahead(p,deg,dist){let r=6378137,x=deg*Math.PI/180,d=dist/r,a=p.lat*Math
 function routeMeters(route){if(!route||!route.points)return 0;return route.distance||route.points.reduce((n,p,i)=>n+(i?meters(route.points[i-1],p):0),0)}
 function battery(){return Math.max(0,state.batteryStart-state.tripM/(state.fullRange*1000)*100)}
 function toast(msg,ms=2800){const el=$('toast');el.textContent=msg;el.style.display='block';clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.style.display='none',ms)}
-function status(msg){$('status').textContent=msg}
+function status(msg,alert=false){const el=$('status');el.textContent=msg;el.classList.toggle('gps-alert',alert)}
+function gpsStatus(accuracy){
+  state.lastAccuracy=accuracy;
+  if(!Number.isFinite(accuracy)||accuracy>100)status(`GPS weak • ±${Math.round(accuracy)||'?'} m • Tap to retry`,true);
+  else status(`GPS ready • ±${Math.round(accuracy)} m`);
+}
 function speak(text,urgent=false){if(state.muted||!text||!window.speechSynthesis)return;try{if(urgent)speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='en-PH';u.rate=1.02;speechSynthesis.speak(u)}catch(_){}}
 function save(force=false){const now=Date.now();if(!force&&now-state.lastSave<7000)return;state.lastSave=now;
  try{const route=state.routes[state.selected];localStorage.setItem(STORAGE,JSON.stringify({dest:state.dest,destPoint:state.destPoint,route:route?{...route,points:route.points.map(p=>({lat:+p.lat.toFixed(5),lng:+p.lng.toFixed(5)}))}:null,batteryStart:state.batteryStart,fullRange:state.fullRange,tripM:state.tripM,autoRide:state.autoRide,muted:state.muted,zoomStyle:state.zoom,bikeWidth:state.bikeWidth,directionUp:state.directionUp,riding:state.riding,mode:state.mode,savedAt:Date.now()}));}catch(_){}}
@@ -286,10 +293,11 @@ function beginRide(forceFree=false,silent=false){if(state.riding)return;if(!stat
 }
 function endRide(){if(!state.riding)return;state.riding=false;state.mode='free';document.body.classList.remove('riding');state.moveCount=0;resetMapOrientation();speak('Ride ended.',true);save(true);follow(true)}
 function onGPS(position){const c=position.coords;const gps={lat:c.latitude,lng:c.longitude},now=Date.now(),accuracy=c.accuracy||999;
- if(accuracy>130&&!state.gps)return;
+ // Do not silently discard a coarse first fix: show signal quality, and wait for a precise fix.
+ if(!Number.isFinite(gps.lat)||!Number.isFinite(gps.lng))return;
  const prev=state.gps;const dt=(now-state.lastLocationAt)/1000;
  if(prev&&dt>0){const dx=meters(prev,gps);if(accuracy>100&&dx<accuracy)return;if(dx>Math.max(100,dt*31) && dt<20)return;}
- state.gps=gps;state.lastLocationAt=now;const delta=prev&&dt>=1.5?meters(prev,gps):0;
+ state.gps=gps;state.lastLocationAt=now;gpsStatus(accuracy);const delta=prev&&dt>=1.5?meters(prev,gps):0;
  const inferredSpeed=accuracy<=35&&dt>=1.5&&delta>Math.max(9,accuracy*.85)&&delta<Math.min(130,dt*20)?delta/dt*3.6:0;
  const gpsSpeed=Number.isFinite(c.speed)&&c.speed>=0?c.speed*3.6:0;const newSpeed=Math.max(gpsSpeed,inferredSpeed);state.speedKph=newSpeed;
  // Heading is trustworthy while in motion. Below that, keep last known heading to prevent spinning.
@@ -301,6 +309,7 @@ function onGPS(position){const c=position.coords;const gps={lat:c.latitude,lng:c
    state.heading=((state.heading??measured)+angularDelta(state.heading??measured,measured)*rate+360)%360;
    state.headingAt=now;
  }
+ if(!state.map){status('GPS detected, but map failed to load • Reconnect & reload',true);return;}
  if(!state.marker){state.marker=L.marker([gps.lat,gps.lng],{icon:L.divIcon({className:'',html:'<div class="gps-arrow"><i class="mi">navigation</i></div>',iconSize:[42,42],iconAnchor:[21,21]})}).addTo(state.map)}else state.marker.setLatLng([gps.lat,gps.lng]);
  syncArrowOrientation();
  $('accuracy').textContent=`${Math.round(accuracy)} m`;
@@ -309,8 +318,38 @@ function onGPS(position){const c=position.coords;const gps={lat:c.latitude,lng:c
  dash();if(!state.riding&&state.resumeRide){const free=state.resumeMode!=='route';state.resumeRide=false;beginRide(free,true);toast('Previous ride restored');}
  if(state.riding){updateProgress();applyRideOrientation();follow();}else if(!prev)follow(true);
 }
-function startGPS(){if(!navigator.geolocation){status('GPS not supported');toast('Your browser does not support geolocation');return}
- status('Waiting for GPS permission...');state.gpsWatch=navigator.geolocation.watchPosition(p=>{onGPS(p);if(state.gps&&$('status').textContent.includes('Waiting'))status('GPS ready • bike routing available')},err=>{status('Enable GPS & HTTPS • Free Ride needs location');if(err.code===1)toast('Location permission denied. Enable GPS for this site.',4000)}, {enableHighAccuracy:true,maximumAge:1500,timeout:18000});
+function startGPS(){
+  const seq=++state.gpsRequestId;
+  if(state.gpsWatch!==null&&navigator.geolocation){try{navigator.geolocation.clearWatch(state.gpsWatch)}catch(_){}}
+  state.gpsWatch=null;
+  if(state.gpsWatchdog){clearTimeout(state.gpsWatchdog);state.gpsWatchdog=null;}
+  if(!navigator.geolocation){status('GPS not supported by browser',true);return;}
+  // Mobile browsers frequently block local HTML/content:// and HTTP origins.
+  if(window.isSecureContext===false){status('GPS blocked: open this app using HTTPS • Tap for help',true);return;}
+  state.gpsError='';status('Locating GPS… Tap to retry',true);
+  function received(pos){
+    if(seq!==state.gpsRequestId)return;
+    try{onGPS(pos)}catch(err){console.error('GPS update failed:',err);status('GPS received but navigation error • Retry',true)}
+  }
+  function failed(err){
+    if(seq!==state.gpsRequestId)return;
+    const code=err&&err.code;
+    const msg=code===1?'GPS permission denied • Enable site location':
+              code===2?'GPS signal unavailable • Try outdoors':
+              code===3?'GPS timed out • Tap to retry':'GPS unavailable • Tap to retry';
+    state.gpsError=msg;
+    if(!state.gps||Date.now()-state.lastLocationAt>20000)status(msg,true);
+  }
+  try{
+    state.gpsWatch=navigator.geolocation.watchPosition(received,failed,{enableHighAccuracy:true,maximumAge:1000,timeout:16000});
+    // A coarse cached fix is better than a permanently blank app; low accuracy cannot auto-start.
+    navigator.geolocation.getCurrentPosition(received,()=>{},{enableHighAccuracy:false,maximumAge:60000,timeout:8500});
+    state.gpsWatchdog=setTimeout(()=>{
+      if(seq!==state.gpsRequestId)return;
+      if(!state.gps)status(state.gpsError||'No GPS fix yet • Go outdoors / allow location • Tap to retry',true);
+      else if(Date.now()-state.lastLocationAt>18000)status('GPS signal lost • Tap to retry',true);
+    },17000);
+  }catch(err){console.error('Could not start GPS:',err);status('GPS could not start • Check permissions / HTTPS',true)}
 }
 function nearestOnRoute(r,pt){let bestD=Infinity,best=0;const step=Math.max(1,Math.floor(r.points.length/700));for(let i=0;i<r.points.length;i+=step){const d=meters(pt,r.points[i]);if(d<bestD){bestD=d;best=i}}return{index:best,distance:bestD};}
 function updateProgress(){if(!state.riding||!state.gps)return;
@@ -359,17 +398,24 @@ function bind(){
  $('free-ride').addEventListener('click',()=>{clearRoutes(false);beginRide(true)});
  $('start-ride').addEventListener('click',()=>beginRide(!state.routes.length||state.routes.every(r=>r.blocked)));
  $('end-ride').addEventListener('click',endRide);
- $('recenter').addEventListener('click',()=>{state.overviewUntil=0;follow(true)});$('overview').addEventListener('click',overview);
+ $('recenter').addEventListener('click',()=>{if(!state.gps||Date.now()-state.lastLocationAt>25000)startGPS();state.overviewUntil=0;follow(true)});$('overview').addEventListener('click',overview);
+ $('status').addEventListener('click',()=>{if(window.isSecureContext===false){toast('GPS needs HTTPS. Publish this HTML on Cloudflare Pages / GitHub Pages instead of opening it as a local file.',8500);return;}startGPS();toast('Requesting GPS again…',2000)});
  $('orientation-btn').addEventListener('click',()=>{state.directionUp=!state.directionUp;refreshOrientationButton();if(!state.directionUp)resetMapOrientation();else{state.overviewUntil=0;follow(true)}toast(state.directionUp?'Direction-up map enabled':'North-up map enabled');save(true)});
  $('settings-btn').addEventListener('click',()=>{$('settings-sheet').classList.add('open')});$('close-settings').addEventListener('click',()=>{$('settings-sheet').classList.remove('open')});
  $('settings-sheet').addEventListener('click',e=>{if(e.target===$('settings-sheet'))$('settings-sheet').classList.remove('open')});
  $('audio-btn').addEventListener('click',()=>{state.muted=!state.muted;if(state.muted&&window.speechSynthesis)speechSynthesis.cancel();$('audio-icon').textContent=state.muted?'volume_off':'volume_up';save(true)});
  $('save-settings').addEventListener('click',()=>{const oldWidth=state.bikeWidth;state.batteryStart=clamp(+$('battery-setting').value||0,0,100);state.fullRange=Math.max(1,+$('range-setting').value||35);state.bikeWidth=Math.max(1.5,+$('width-setting').value||2.2);state.zoom=$('zoom-setting').value;state.directionUp=$('direction-setting').checked;if(!state.directionUp)resetMapOrientation();else if(state.riding){state.overviewUntil=0;follow(true);}refreshOrientationButton();state.autoRide=$('autoride-setting').checked;const widthChanged=Math.abs(oldWidth-state.bikeWidth)>.05&&state.routes.length;if(widthChanged)clearRoutes(false);dash();save(true);$('settings-sheet').classList.remove('open');toast(widthChanged?'Width changed • Tap FIND ROUTES again':'Settings saved',widthChanged?4000:2800);});
  $('reset-trip').addEventListener('click',()=>{state.batteryStart=battery();state.tripM=0;$('battery-setting').value=state.batteryStart;dash();save(true);toast('Trip meter reset')});
- document.addEventListener('visibilitychange',()=>{save(true);if(document.visibilityState==='visible'){state.map.invalidateSize();follow(true)}else if(typeof state.map?.stopHeadingUp==='function')state.map.stopHeadingUp()});window.addEventListener('pagehide',()=>save(true));
+ document.addEventListener('visibilitychange',()=>{save(true);if(document.visibilityState==='visible'){
+    if(state.map){state.map.invalidateSize();follow(true)}
+    if(!state.gps||Date.now()-state.lastLocationAt>18000)startGPS();
+  }else if(typeof state.map?.stopHeadingUp==='function')state.map.stopHeadingUp()});window.addEventListener('pagehide',()=>save(true));
 }
-initMap();bind();startGPS();
-if(state.routes.length){state.selected=0;redrawRoutes();drawChoices();chooseRoute(0);status('Saved bike route restored • Verify road conditions');}
+// GPS must start even if the optional map rotation extension / tile CDN fails.
+try{initMap()}catch(err){console.error('Map startup failed:',err);status('Map failed to load • Check internet and reload',true)}
+try{bind()}catch(err){console.error('UI startup failed:',err);status('Navigation UI failed to load • Reload',true)}
+startGPS();
+if(state.map&&state.routes.length){try{state.selected=0;redrawRoutes();drawChoices();chooseRoute(0)}catch(err){console.error('Route restore error:',err)}}
 })();
 
 </script>
