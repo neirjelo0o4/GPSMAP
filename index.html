@@ -576,7 +576,12 @@
         }
 
         function activateSearchMode(inputEl) {
-            handleSearchInput(inputEl);
+            activeSearchInput = inputEl;
+            // Focusing an already pinned destination must not invalidate its route.
+            // Route invalidation happens only when the user actually edits the field.
+            if (!inputEl.dataset.lat && !inputEl.dataset.lng && inputEl.value.trim().length >= 3) {
+                handleSearchInput(inputEl);
+            }
         }
         function deactivateSearchMode() {
             setTimeout(() => {
@@ -711,14 +716,70 @@
 
         let activeSearchInput = null;
         let debounce;
-        
+
+        function clearActiveRouteForFreeRide(options = {}) {
+            const keepInputs = options.keepInputs !== false;
+
+            if (routingControl) {
+                try { map.removeControl(routingControl); } catch (e) {}
+                routingControl = null;
+            }
+
+            activeWaypointsList = [];
+            activeLegDistances = [];
+            activeRouteCoords = [];
+            activeInstructions = [];
+            activeRouteDistanceKm = 0;
+            currentInstructionIndex = 0;
+            announcedInstructionKey = "";
+            currentWaypointTargetIndex = 1;
+            routeTotalTimeSeconds = 0;
+            routeRemainingMeters = 0;
+            routeRemainingTimeSeconds = 0;
+            routeRemainingMetersByIndex = [];
+            lastNearestRouteIndex = 0;
+            nextManeuverDistanceMeters = Infinity;
+            overviewModeUntil = 0;
+            isRecalculating = false;
+
+            localStorage.setItem('nav_hadRoute', '0');
+            localStorage.setItem('nav_mode', 'free');
+            localStorage.removeItem('nav_waypointTargetIndex');
+
+            if (!keepInputs) {
+                document.querySelectorAll('.dest-input').forEach(input => {
+                    input.value = '';
+                    input.removeAttribute('data-lat');
+                    input.removeAttribute('data-lng');
+                });
+                localStorage.setItem('nav_savedStops', '[]');
+            }
+
+            if (!isNavigating) {
+                document.getElementById('route-eta').innerText = 'Free Ride Mode';
+                document.getElementById('route-dist').innerText = 'GPS Tracking & Trip Meter';
+                document.body.classList.remove('route-nav-active');
+                document.body.classList.remove('free-nav-active');
+            }
+
+            savePlannerState();
+        }
+
         function handleSearchInput(inputEl) {
             activeSearchInput = inputEl;
+            const hadPinnedLocation = inputEl.hasAttribute('data-lat') || inputEl.hasAttribute('data-lng');
             inputEl.removeAttribute('data-lat');
             inputEl.removeAttribute('data-lng');
-            savePlannerState();
+
+            // Any edit to a previously selected destination invalidates the old route.
+            // This prevents a deleted/changed place from remaining as a hidden active route.
+            if (hadPinnedLocation || activeWaypointsList.length > 1) {
+                clearActiveRouteForFreeRide({ keepInputs: true });
+            } else {
+                savePlannerState();
+            }
             
-            const query = inputEl.value;
+            const query = inputEl.value.trim();
             const box = document.getElementById('suggestions-box');
             
             if (query.length < 3) { 
@@ -807,9 +868,15 @@
 
         function removeStopRow(iconEl) {
             const row = iconEl.closest('.stop-row');
+            const removedPinnedStop = !!(row && row.querySelector('.dest-input[data-lat][data-lng]'));
             if (row) row.remove();
             updatePlaceholders();
-            savePlannerState();
+
+            if (removedPinnedStop || activeWaypointsList.length > 1) {
+                clearActiveRouteForFreeRide({ keepInputs: true });
+            } else {
+                savePlannerState();
+            }
         }
 
         function restoreSavedStops() {
@@ -1102,7 +1169,12 @@
                 document.getElementById('btn-start').style.display = 'none';
                 document.getElementById('btn-stop').style.display = 'flex';
 
-                const routeMode = activeWaypointsList.length > 1;
+                const hasPinnedDestination = Array.from(document.querySelectorAll('.dest-input'))
+                    .some(input => input.dataset.lat && input.dataset.lng);
+                if (!hasPinnedDestination && activeWaypointsList.length > 1) {
+                    clearActiveRouteForFreeRide({ keepInputs: true });
+                }
+                const routeMode = hasPinnedDestination && activeWaypointsList.length > 1;
                 document.body.classList.toggle('route-nav-active', routeMode);
                 document.body.classList.toggle('free-nav-active', !routeMode);
                 
@@ -1119,7 +1191,7 @@
                 map.touchZoom.disable();
                 map.setView([currentLat, currentLng], 16.5, {animate: false});
                 
-                if(activeWaypointsList.length > 1) {
+                if(routeMode) {
                     if (!silentStart) speak("Motorcycle navigation started. Follow the route.", true);
                     document.getElementById('turn-text').innerText = "Motorcycle route";
                     document.getElementById('turn-icon').innerText = "straight";
@@ -1180,7 +1252,12 @@
             if (autoMotionConfirmations >= 2) {
                 autoMotionConfirmations = 0;
                 autoMotionAnchor = point;
-                const hasRoute = activeWaypointsList.length > 1;
+                const hasPinnedDestination = Array.from(document.querySelectorAll('.dest-input'))
+                    .some(input => input.dataset.lat && input.dataset.lng);
+                const hasRoute = hasPinnedDestination && activeWaypointsList.length > 1;
+                if (!hasRoute && activeWaypointsList.length > 1) {
+                    clearActiveRouteForFreeRide({ keepInputs: true });
+                }
                 toggleNav(false, false);
                 showToast(hasRoute ? 'Movement detected • Navigation started' : 'Movement detected • Free Ride started');
                 setTimeout(hideToast, 2200);
