@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#101721">
   <meta name="description" content="Tesla-inspired local-road navigation with OpenStreetMap bicycle navigation with road-first routing.">
-  <title>e-Bike NAV V12.1 • Fixed Visual-Viewport Cockpit</title>
+  <title>E-Bike NAV V13 PRO • Smart Battery and Road Safety</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <!-- Native Leaflet layer rotation: no oversized 200vw map or whole-page CSS rotation. -->
@@ -473,12 +473,23 @@ body.riding .ui>.status:not(.gps-alert):not(.route-alert){display:none!important
   body.riding .ui>.recenter{right:calc(138px + env(safe-area-inset-right))!important}
 }
 
+
+/* V13 safety review is independent of the navigation cockpit CSS and always scrollable. */
+.safety-scrim[hidden]{display:none!important}
+.safety-scrim{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:12px max(12px,env(safe-area-inset-right)) 12px max(12px,env(safe-area-inset-left));background:rgba(2,8,16,.82)}
+.review-card{width:min(460px,100%);max-height:calc(100dvh - 24px);overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;background:#142131;color:#f2f7ff;border:1px solid #ffffff35;box-shadow:0 12px 45px #0009;border-radius:18px;padding:18px}
+.review-head{display:flex;gap:9px;align-items:center;font-size:18px}.review-head .mi{color:#ffb65d}
+.review-card p{font-size:12px;line-height:1.55;color:#e0ebf6}.review-card .review-disclaimer{color:#b5c6d8}
+.review-actions{display:flex;gap:8px;flex-wrap:wrap;position:sticky;bottom:-18px;padding:12px 0 0;background:#142131}
+.review-actions button{flex:1 1 150px;min-height:42px;border-radius:10px;background:#34495c;color:white;font-size:11px;font-weight:800}
+.review-actions #review-accept{background:#267feb}
+@media (orientation:landscape) and (max-height:450px){.review-card{padding:12px;max-height:calc(100dvh - 16px)}.review-head{font-size:15px}.review-card p{margin:8px 0}.review-actions{bottom:-12px}}
 </style>
 </head>
 <body class="pseudo3d">
   <div id="free-map" aria-label="OpenStreetMap bicycle navigation with route choices"></div>
   <div class="ui">
-    <div class="appmark glass"><i class="mi">electric_moped</i><div>e-MOTO NAV<em>FREE OSM • TESLA 3D-LITE UI</em></div></div>
+    <div class="appmark glass"><i class="mi">electric_moped</i><div>e-MOTO NAV<em>V13 PRO • FREE MAPS</em></div></div>
     <div class="top-actions"><button class="round heading-on" id="orientation-btn" title="Direction up (tap for north up)" aria-label="Toggle map orientation"><i class="mi" id="orientation-icon">explore</i></button><button class="round voice-action" id="voice-check" title="Voice round-trip battery check" aria-label="Speak round-trip battery estimate"><i class="mi">record_voice_over</i></button><button class="round" id="settings-btn" title="Settings"><i class="mi">tune</i></button><button class="round" id="audio-btn" title="Mute or unmute"><i class="mi" id="audio-icon">volume_up</i></button></div>
     <section class="planning glass" id="planning">
       <div class="field-label">Starting location • saved for the return trip</div>
@@ -486,7 +497,7 @@ body.riding .ui>.status:not(.gps-alert):not(.route-alert){display:none!important
       <div class="field-label">Destination • FREE bicycle routing</div>
       <div class="search-row"><i class="mi">search</i><input id="destination" placeholder="Type an address or place" autocomplete="street-address" aria-label="Destination"><button class="small-icon" id="clear-destination" aria-label="Clear destination"><i class="mi">close</i></button></div>
       <div class="action-line"><button class="primary" id="find-route"><i class="mi" style="font-size:16px;vertical-align:middle">route</i> FIND ROUTES</button><button class="ghost" id="free-ride">FREE RIDE</button></div>
-      <div class="safety-note"><b>BIKE ROUTE • PREFER WIDER ROADS</b><br>Flags known narrow alleys, footpaths and toll tags. Road width often missing in OSM: check signs and physical clearance. A 4-wheel e-bike may not be permitted on every bike lane.</div>
+      <div class="safety-note"><b>4-WHEEL E-BIKE • ROAD-FIRST</b><br>Unknown widths require your review before navigation. This is a map-tag spot check, never a guarantee of clearance, legality, or no toll. Verify signs and roadway in person.</div>
     </section>
     <div class="route-options" id="route-options" aria-label="Route options"></div>
     <div class="place-results glass" id="place-results" aria-label="Search results"></div>
@@ -502,14 +513,24 @@ body.riding .ui>.status:not(.gps-alert):not(.route-alert){display:none!important
     <section class="nav-footer glass"><div class="nav-metric"><b id="eta">—</b><span>ARRIVAL</span></div><div class="nav-metric"><b id="remaining-time">—</b><span>TIME LEFT</span></div><div class="nav-metric"><b id="remaining-dist">—</b><span>DISTANCE</span></div><button class="round" id="overview" title="Route overview"><i class="mi">map</i></button><button class="round" id="end-ride" title="End ride" style="background:#d94d59"><i class="mi">close</i></button></section>
   </div>
   <div class="toast" id="toast" role="status"></div>
+  <div class="safety-scrim" id="route-review" role="dialog" aria-modal="true" aria-label="Route safety review" hidden>
+    <section class="review-card">
+      <div class="review-head"><i class="mi">warning</i><strong>Review this bike route</strong></div>
+      <p id="review-summary">Some sections of this road cannot be verified from map data.</p>
+      <p class="review-disclaimer">A 4-wheel e-bike may not fit or be permitted on a cycling route. Toll tags, access, actual road width and traffic conditions may be missing. Never follow the route against signs or if the road looks unsafe.</p>
+      <div class="review-actions"><button id="review-cancel" type="button">STAY IN PLANNING</button><button id="review-accept" type="button">I'LL CHECK THE ROAD</button></div>
+    </section>
+  </div>
   <script>window.addEventListener("load",()=>{if(typeof L==="undefined"){document.getElementById("status").textContent="Map library failed to load • Check internet";}});</script>
 
   <div class="sheet" id="settings-sheet" role="dialog" aria-modal="true" aria-label="e-Moto Settings"><div class="sheet-panel">
-    <div class="sheet-title"><span>e-Moto Settings</span><button class="small-icon" id="close-settings" aria-label="Close settings"><i class="mi">close</i></button></div>
+    <div class="sheet-title"><span>e-Moto PRO Settings</span><button class="small-icon" id="close-settings" aria-label="Close settings"><i class="mi">close</i></button></div>
     <div class="settings-scroll" id="settings-scroll" tabindex="0" aria-label="Scrollable settings options">
     <div class="setting"><div>Estimated battery (%)<small>Manually update after charging</small></div><input id="battery-setting" type="number" min="0" max="100" value="100"></div>
     <div class="setting"><div>Full-charge range (km)</div><input id="range-setting" type="number" min="1" max="500" value="35"></div>
     <div class="setting"><div>0–100% charge time (hours)<small>Used for voice charging-time estimates</small></div><input id="charge-setting" type="number" min="1" max="24" step="0.5" value="8"></div>
+    <div class="setting"><div>Return-home battery reserve (%)<small>Extra margin: default 20%, not measured battery</small></div><input id="reserve-setting" type="number" min="10" max="40" step="5" value="20"></div>
+    <div class="setting"><div>Confirm battery estimate<small>Check after inspecting the e-bike battery; clears uncertainty without resetting the trip meter</small></div><input id="confirm-battery-setting" type="checkbox" style="width:20px;height:20px;accent-color:#409bff"></div>
     <div class="setting"><div>Direction-up map<small>Rotates to your direction while riding; stationary = hold last heading</small></div><input type="checkbox" id="direction-setting" checked style="width:20px;height:20px;accent-color:#409bff"></div>
     <div class="setting"><div>Camera zoom<small>Tesla wide recommended</small></div><select id="zoom-setting"><option value="wide">Tesla wide</option><option value="far">Far ahead</option><option value="near">Near</option></select></div>
     <div class="setting"><div>3D-like navigation view<small>Tilted map while riding for easier look-ahead</small></div><input type="checkbox" id="pseudo3d-setting" checked style="width:20px;height:20px;accent-color:#409bff"></div>
@@ -532,22 +553,23 @@ const validPoint=p=>!!(p&&Number.isFinite(+p.lat)&&Number.isFinite(+p.lng)&&Math
 const state={
   gps:null,prevGps:null,gpsWatch:null,map:null,marker:null,pin:null,startPin:null,layers:[],selected:0,
   startPoint:validPoint(prior.startPoint)?prior.startPoint:null,startSavedAt:prior.startSavedAt||0,pendingStartGPS:false,
-  fullChargeHours:clamp(+prior.fullChargeHours||8,1,24),
+  fullChargeHours:clamp(+prior.fullChargeHours||8,1,24),batteryReserve:clamp(Number.isFinite(+prior.batteryReserve)?+prior.batteryReserve:20,10,40),
   returnMeters:Number.isFinite(prior.returnMeters)&&prior.returnMeters>0?prior.returnMeters:null,
   returnKey:prior.returnKey||'',returnCheckSeq:0,returnBusy:false,
-  batteryUncertain:!!prior.batteryUncertain||(!!prior.riding&&Date.now()-(prior.savedAt||0)>90000),
+  batteryUncertain:!!prior.batteryUncertain||(!!prior.riding&&Date.now()-Math.max(prior.lastHiddenAt||0,prior.savedAt||0)>60000),
   lastHiddenAt:prior.lastHiddenAt||0,lastVoiceAnalysisKey:'',
   routes:prior.route&&Array.isArray(prior.route.points)?[{...prior.route,audit:'unknown',blocked:false}]:[],routeReady:!!prior.route,
   resumeRide:!!prior.riding && (Date.now()-(prior.savedAt||0)<3600000),resumeMode:prior.mode||'free',
   dest:prior.dest||'',destPoint:prior.destPoint||null,requestId:0,searchId:0,
   riding:false,mode:'free',autoRide:prior.autoRide!==false,muted:!!prior.muted,
-  batteryStart:clamp(Number.isFinite(+prior.batteryStart)?+prior.batteryStart:100,0,100),
+  batteryStart:clamp(Number.isFinite(+prior.batteryStart)?+prior.batteryStart:100,0,100),batteryAtTripM:Math.max(0,Number.isFinite(+prior.batteryAtTripM)?+prior.batteryAtTripM:0),
   fullRange:Math.max(1,+prior.fullRange||35),tripM:Math.max(0,+prior.tripM||0),
   bikeWidth:Math.max(1.5,+prior.bikeWidth||2.2),zoom:prior.zoomStyle||'wide',directionUp:prior.directionUp!==false,pseudo3d:prior.pseudo3d!==false,
   speedKph:0,heading:null,headingAt:0,progress:0,nextTurn:0,voiceMarks:new Set(),moveCount:0,
   lastSave:0,lastCamera:0,lastReroute:0,offRouteCount:0,overviewUntil:0,
   geocoding:false,safetyBusy:false,routingBusy:false,lastLocationAt:0,rerouteCycle:0,
-  offRouteSince:0,gpsRequestId:0,gpsWatchdog:null,gpsError:'',lastAccuracy:Infinity
+  offRouteSince:0,gpsRequestId:0,gpsWatchdog:null,gpsError:'',lastAccuracy:Infinity,
+  reviewedRouteId:null,pendingRouteReview:null,lastBatteryAlertLevel:'',lastBatteryAlertAt:0,lastBatteryCheckAt:0,lastGpsGapAlertAt:0
 };
 const colors=['#2289ff','#63b5ff','#93a2c1','#8b82ee'];
 function num(n,p=1){return (Math.round(n*10**p)/10**p).toFixed(p)}
@@ -559,7 +581,7 @@ function bearing(a,b){const x=a.lat*Math.PI/180,y=b.lat*Math.PI/180,z=(b.lng-a.l
 function angularDelta(from,to){return ((to-from+540)%360)-180}
 function ahead(p,deg,dist){let r=6378137,x=deg*Math.PI/180,d=dist/r,a=p.lat*Math.PI/180,b=p.lng*Math.PI/180,c=Math.asin(Math.sin(a)*Math.cos(d)+Math.cos(a)*Math.sin(d)*Math.cos(x)),e=b+Math.atan2(Math.sin(x)*Math.sin(d)*Math.cos(a),Math.cos(d)-Math.sin(a)*Math.sin(c));return{lat:c*180/Math.PI,lng:e*180/Math.PI}}
 function routeMeters(route){if(!route||!route.points)return 0;return route.distance||route.points.reduce((n,p,i)=>n+(i?meters(route.points[i-1],p):0),0)}
-function battery(){return Math.max(0,state.batteryStart-state.tripM/(state.fullRange*1000)*100)}
+function battery(){return Math.max(0,state.batteryStart-Math.max(0,state.tripM-state.batteryAtTripM)/(state.fullRange*1000)*100)}
 function toast(msg,ms=2800){const el=$('toast');el.textContent=msg;el.style.display='block';clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.style.display='none',ms)}
 function status(msg,alert=false){const el=$('status');el.textContent=msg;el.classList.toggle('gps-alert',alert)}
 function gpsStatus(accuracy){
@@ -572,10 +594,10 @@ function gpsStatus(accuracy){
 function speak(text,urgent=false){if(state.muted||!text||!window.speechSynthesis)return;try{if(urgent)speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='en-PH';u.rate=1.02;speechSynthesis.speak(u)}catch(_){}}
 function save(force=false){const now=Date.now();if(!force&&now-state.lastSave<7000)return;state.lastSave=now;
  try{const route=state.routes[state.selected];localStorage.setItem(STORAGE,JSON.stringify({dest:state.dest,destPoint:state.destPoint,startPoint:state.startPoint,startSavedAt:state.startSavedAt,
- returnMeters:state.returnMeters,returnKey:state.returnKey,fullChargeHours:state.fullChargeHours,
+ returnMeters:state.returnMeters,returnKey:state.returnKey,fullChargeHours:state.fullChargeHours,batteryReserve:state.batteryReserve,
  batteryUncertain:state.batteryUncertain,lastHiddenAt:state.lastHiddenAt,
  route:route?{...route,points:route.points.map(p=>({lat:+p.lat.toFixed(5),lng:+p.lng.toFixed(5)}))}:null,
- batteryStart:state.batteryStart,fullRange:state.fullRange,tripM:state.tripM,autoRide:state.autoRide,muted:state.muted,zoomStyle:state.zoom,bikeWidth:state.bikeWidth,directionUp:state.directionUp,pseudo3d:state.pseudo3d,riding:state.riding,mode:state.mode,savedAt:Date.now()}));}catch(_){}}
+ batteryStart:state.batteryStart,batteryAtTripM:state.batteryAtTripM,fullRange:state.fullRange,tripM:state.tripM,autoRide:state.autoRide,muted:state.muted,zoomStyle:state.zoom,bikeWidth:state.bikeWidth,directionUp:state.directionUp,pseudo3d:state.pseudo3d,riding:state.riding,mode:state.mode,savedAt:Date.now()}));}catch(_){}}
 function dash(){const b=battery();$('speed').textContent=Math.round(state.speedKph);$('battery').textContent=`${Math.round(b)}%`;$('range').textContent=`${num(b/100*state.fullRange)} km`;$('trip').textContent=`${num(state.tripM/1000)} km`;}
 function initMap(){state.map=L.map('free-map',{zoomControl:false,preferCanvas:true,zoomSnap:.25,zoomDelta:.5,rotate:true,bearing:0,touchRotate:false,dragRotate:false,rotateControl:false}).setView([14.6,121.17],15.5);
  if(typeof state.map.setBearing==='function')state.map.on('rotate',syncArrowOrientation);
@@ -599,12 +621,12 @@ function useGPSStart(){if(!state.gps||Date.now()-state.lastLocationAt>30000||sta
 function removeSavedStart(){state.pendingStartGPS=false;state.startPoint=null;state.startSavedAt=0;
  if(state.startPin&&state.map){state.map.removeLayer(state.startPin);state.startPin=null;}updateStartLabel();clearRoutes(false);save(true);
  toast('Saved start cleared. Save a new start to calculate the return trip.');}
-function clearRoutes(clearDest=false){clearRouteAlert();state.requestId++;state.returnCheckSeq++;state.returnBusy=false;state.returnMeters=null;state.returnKey='';state.routes=[];state.selected=0;state.progress=0;state.nextTurn=0;state.voiceMarks.clear();state.offRouteCount=0;state.overviewUntil=0;state.routingBusy=false;
+function clearRoutes(clearDest=false){clearRouteAlert();state.requestId++;state.returnCheckSeq++;state.returnBusy=false;state.returnMeters=null;state.returnKey='';state.routes=[];state.selected=0;state.reviewedRouteId=null;closeRouteReview();state.progress=0;state.nextTurn=0;state.voiceMarks.clear();state.offRouteCount=0;state.overviewUntil=0;state.routingBusy=false;
  for(const layer of state.layers)state.map.removeLayer(layer);state.layers=[];
  if(clearDest){state.dest='';state.destPoint=null;$('destination').value='';if(state.pin){state.map.removeLayer(state.pin);state.pin=null;}}
  $('route-options').replaceChildren();$('route-options').style.display='none';$('summary-title').textContent='Free Ride Ready';$('summary-desc').textContent='No route • GPS and battery tracking available';status('BIKE • AVOID TOLL • ROAD FIRST');save(true);
 }
-function chooseRoute(index,options={}){if(!state.routes[index]||state.routes[index].blocked)return;state.selected=index;state.nextTurn=0;state.progress=0;state.voiceMarks.clear();redrawRoutes();drawChoices();const r=state.routes[index];
+function chooseRoute(index,options={}){if(!state.routes[index]||state.routes[index].blocked)return;closeRouteReview();state.reviewedRouteId=null;state.selected=index;state.nextTurn=0;state.progress=0;state.voiceMarks.clear();redrawRoutes();drawChoices();const r=state.routes[index];
  $('summary-title').textContent=fmtMin(r.duration);$('summary-desc').textContent=`${fmtKm(r.distance)} • ${r.label} • ${r.audit==='checked'?'Width spot-checked':'Width not verified'}`;
  if(!options.silentBattery&&state.returnMeters&&state.startPoint&&!state.routingBusy)voiceBatteryReport(false);
  save(true);}
@@ -614,7 +636,7 @@ function redrawRoutes(){if(!state.map)return;for(const l of state.layers)state.m
 function routeBounds(){resetMapOrientation();const r=state.routes[state.selected];if(r?.points.length)state.map.fitBounds(L.latLngBounds(r.points.map(p=>[p.lat,p.lng])),{padding:[48,55],maxZoom:15.5,animate:false})}
 function drawChoices(){const wrap=$('route-options');wrap.replaceChildren();if(!state.routes.length){wrap.style.display='none';return;}wrap.style.display='flex';
  state.routes.forEach((r,i)=>{const b=document.createElement('button');b.type='button';b.className=`route-option ${i===state.selected?'selected':''}`;b.disabled=!!r.blocked;
- let audit=r.blocked?'REJECTED • narrow/path risk':r.audit==='checked'?'No known narrow tag at sampled points':r.audit==='unknown'?'Width tags could not be checked':'Width tags not verified';
+ let audit=r.blocked?'REJECTED • mapped hazard':r.audit==='checked'?'Map tags spot-screened • clearance unknown':r.audit==='unknown'?'Unverified road access / width':'Awaiting road check';
  b.innerHTML=`<div class="option-main"><div class="option-title">${safeHTML(r.label)} ${r.blocked?'⛔':''}</div><div class="option-sub">${safeHTML(fmtKm(r.distance))} • ${safeHTML(audit)}</div></div><div class="option-eta">${safeHTML(fmtMin(r.duration))}</div>`;
  b.addEventListener('click',()=>chooseRoute(i));wrap.appendChild(b)});
 }
@@ -689,20 +711,42 @@ function voiceBatteryReport(manual=true){const route=state.routes[state.selected
  const outbound=outboundStillNeeded(route),outM=outbound.distance,returnReady=state.returnKey===returnTripKey()&&Number.isFinite(state.returnMeters)&&state.returnMeters>0;
  if(!returnReady){if(manual){speak('I am checking the return road route. A round trip cannot be confirmed until the return distance is known.',true);ensureReturnRoute();}return;}
  const backM=state.returnMeters,totalM=outM+backM,availableM=battery()/100*state.fullRange*1000;
- const reserveM=0.15*state.fullRange*1000;
+ const reserveM=(state.batteryReserve/100)*state.fullRange*1000;
  const outwardKm=num(outM/1000),backKm=num(backM/1000),totalKm=num(totalM/1000);
  const suffix='This is a battery estimate, not a guarantee. Road width and legal access are not fully verified. Check signs, clearance, and actual battery.';
  let message=`Round trip battery check. To the destination, ${outwardKm} kilometers. Returning to your saved start, ${backKm} kilometers. Total ${totalKm} kilometers. `;
  if(!outbound.known)message+='You are not on the selected route, so the outgoing distance may be inaccurate. Recalculate from your current location. ';
  if(route.audit==='unknown')message+='Current road-width tags could not be verified. ';
  if(route.blocked){speak('Warning. The current route has a mapped road restriction. Stop safely and check other roads.',true);return;}
- if(state.batteryUncertain)message+='Your battery estimate may be outdated because the app was in the background. Please update your battery in settings. ';
+ if(state.batteryUncertain)message+='WARNING. GPS tracking paused or may have missed some distance. Please update the actual battery percentage; I cannot confirm battery sufficiency. ';
  if(outM>availableM){message+='Warning. Your estimated battery range is not enough to reach the destination. Charge before traveling. '}
  else if(totalM+reserveM>availableM){
  const deficitM=totalM+reserveM-availableM,hours=Math.ceil(deficitM/(state.fullRange*1000)*state.fullChargeHours*10)/10;
- message+=`You may reach the destination, but the round trip does not have a fifteen percent battery reserve. Based on your charge setting, plan around ${hours.toFixed(1)} hours of charging at the destination before returning. Charging time is approximate. `;
- }else{message+=`Your estimated battery is enough for the round trip with about fifteen percent reserve. Expected remaining battery is around ${Math.round((availableM-totalM)/(state.fullRange*1000)*100)} percent. `}
+ message+=`You may reach the destination, but the round trip does not have the selected ${state.batteryReserve} percent battery reserve. Based on your charge setting, plan around ${hours.toFixed(1)} hours of charging at the destination before returning. Charging time is approximate. `;
+ }else{message+=state.batteryUncertain?'Your stored battery estimate is potentially outdated. Do not rely on it until you confirm actual battery. ':`Your estimated battery may cover the round trip with ${state.batteryReserve} percent reserve. Expected remaining battery is around ${Math.round((availableM-totalM)/(state.fullRange*1000)*100)} percent. `}
  speak(message+suffix,manual);
+}
+function proactiveBatteryCheck(force=false){
+ if(!state.riding||state.mode!=='route'||state.routingBusy)return;
+ const now=Date.now();if(!force&&now-state.lastBatteryCheckAt<45000)return;
+ state.lastBatteryCheckAt=now;
+ const r=state.routes[state.selected];if(!r||r.blocked||!validPoint(state.startPoint))return;
+ const ready=state.returnKey===returnTripKey()&&Number.isFinite(state.returnMeters)&&state.returnMeters>0;
+ if(!ready)return;
+ const outbound=outboundStillNeeded(r);if(!outbound.known)return;
+ const availableM=battery()/100*state.fullRange*1000;
+ const needed=outbound.distance+state.returnMeters+(state.batteryReserve/100)*state.fullRange*1000;
+ const level=state.batteryUncertain?'uncertain':outbound.distance>availableM?'critical':needed>availableM?'warning':'okay';
+ const severity={okay:0,uncertain:1,warning:2,critical:3};
+ if(level==='okay'){state.lastBatteryAlertLevel='okay';return}
+ const worse=severity[level]>(severity[state.lastBatteryAlertLevel]??-1);
+ if(!worse&&now-state.lastBatteryAlertAt<300000)return;
+ state.lastBatteryAlertAt=now;state.lastBatteryAlertLevel=level;
+ let message=level==='critical'?'Warning. Estimated remaining range may not reach the destination. Find a safe place to stop and check actual battery.':
+ level==='warning'?`Battery warning. The remaining round trip may not have your ${state.batteryReserve} percent reserve. Please plan a safe charging stop.`:
+ 'Tracking may have paused while you were in another app. Actual battery may differ. Stop safely and update battery in Settings.';
+ speak(message,level==='critical');
+ if(level==='critical')toast('LOW RANGE • Check battery and plan a safe stop',6000);
 }
 async function findRoutes(options={}){
  clearRouteAlert();
@@ -720,7 +764,7 @@ async function findRoutes(options={}){
    if(token!==state.requestId)return;
    candidates=uniqueRoutes(candidates);
    if(!candidates.length)throw Error(mainError?.message||'No accessible bicycle route');
-   state.routes=candidates;state.selected=0;state.safetyBusy=true;redrawRoutes();drawChoices();routeBounds();
+   state.routes=candidates;state.selected=0;state.reviewedRouteId=null;state.safetyBusy=true;redrawRoutes();drawChoices();routeBounds();
    status('Checking mapped narrow roads...');
    if(!options.quick)await spotCheckWays(candidates,token);else candidates.forEach(r=>r.audit='unknown');
    if(token!==state.requestId)return;
@@ -730,7 +774,7 @@ async function findRoutes(options={}){
    state.selected=first;chooseRoute(first);
    if(validPoint(state.startPoint))ensureReturnRoute();
    else toast('Save your starting GPS point to enable round-trip voice analysis.',3800);
-   status(candidates.some(r=>r.audit==='unknown')?'BIKE ROUTE • WIDTH NOT VERIFIED':'BIKE ROUTE • KNOWN NARROW TAGS SCREENED');
+   status(candidates.some(r=>r.audit==='unknown')?'BIKE ROUTE • WIDTH NOT VERIFIED':'BIKE ROUTE • TAGS SPOT-SCREENED (NOT GUARANTEED)');
    if(candidates.length>1)toast(`${candidates.filter(r=>!r.blocked).length} route option(s). Choose before starting.`);else toast('Bike route ready • review the road before riding');
  }catch(err){if(token!==state.requestId)return;status('Route server unavailable • Free Ride works');toast('No route found: '+String(err?.message||'Server unavailable').slice(0,95),4600)}
  finally{if(token===state.requestId){state.routingBusy=false;state.safetyBusy=false;$('find-route').disabled=false;save(true)}}
@@ -784,7 +828,22 @@ function applyRideOrientation(){
  }catch(_){}
  syncArrowOrientation();
 }
-function beginRide(forceFree=false,silent=false){clearRouteAlert();if(state.riding)return;if(!state.gps){toast('Allow GPS first');return}if(state.safetyBusy&&!forceFree){toast('Wait for narrow-road check, or choose Free Ride.',4000);return}
+function routeReviewId(r){if(!r?.points?.length)return '';const a=r.points[0],b=r.points[Math.floor(r.points.length/2)],c=r.points[r.points.length-1];return [a,b,c].map(p=>p.lat.toFixed(5)+','+p.lng.toFixed(5)).join('|')+'|'+Math.round(r.distance||0);}
+function closeRouteReview(){const modal=$('route-review');if(modal)modal.hidden=true;state.pendingRouteReview=null;}
+function requestRouteReview(route){
+ state.pendingRouteReview=routeReviewId(route);
+ $('review-summary').textContent=route.audit==='unknown'?'Map road tags could not be checked. Width, toll, access and e-bike suitability are unknown.':
+ 'Available road tags were spot-screened, but road width, toll, restrictions and e-bike suitability are NOT verified end-to-end.';
+ $('route-review').hidden=false;
+}
+function beginRide(forceFree=false,silent=false,reviewed=false){
+ if(state.riding)return;
+ if(!state.gps){toast('Allow GPS first');return}
+ if(state.safetyBusy&&!forceFree){toast('Wait for road-tag check, or choose Free Ride.',4000);return}
+ const route=state.routes[state.selected];
+ if(!forceFree&&route?.blocked){toast('Route has a mapped hazard. Use Free Ride or choose another route.',5200);return}
+ if(!forceFree&&route&&route.audit!=='checked'&&!reviewed){requestRouteReview(route);return}
+ clearRouteAlert();
  state.mode=!forceFree&&state.routes[state.selected]&&!state.routes[state.selected].blocked?'route':'free';state.riding=true;state.moveCount=0;state.prevGps=state.gps;state.nextTurn=0;state.voiceMarks.clear();state.offRouteCount=0;state.overviewUntil=0;
  document.body.classList.add('riding');
  if(state.mode==='free'){for(const layer of state.layers){try{state.map.removeLayer(layer)}catch(_){}}state.layers=[];} // Preserve route for range analysis without drawing it during Free Ride.
@@ -796,6 +855,8 @@ function onGPS(position){const c=position.coords;const gps={lat:c.latitude,lng:c
  // Do not silently discard a coarse first fix: show signal quality, and wait for a precise fix.
  if(!Number.isFinite(gps.lat)||!Number.isFinite(gps.lng))return;
  const prev=state.gps;const dt=(now-state.lastLocationAt)/1000;
+ if(state.riding&&prev&&dt>65){state.batteryUncertain=true;if(now-state.lastGpsGapAlertAt>60000){toast('GPS gap detected • trip and battery estimate may be incomplete',5500);state.lastGpsGapAlertAt=now;}}
+
  if(prev&&dt>0){const dx=meters(prev,gps);if(accuracy>100&&dx<accuracy)return;if(dx>Math.max(100,dt*31) && dt<20)return;}
  state.gps=gps;state.lastLocationAt=now;gpsStatus(accuracy);if(state.pendingStartGPS&&accuracy<=90)captureStartGPS();const delta=prev&&dt>=1.5?meters(prev,gps):0;
  const inferredSpeed=accuracy<=35&&dt>=1.5&&delta>Math.max(9,accuracy*.85)&&delta<Math.min(130,dt*20)?delta/dt*3.6:0;
@@ -814,9 +875,15 @@ function onGPS(position){const c=position.coords;const gps={lat:c.latitude,lng:c
  syncArrowOrientation();
  $('accuracy').textContent=`${Math.round(accuracy)} m`;
  if(state.riding&&prev&&dt>0&&accuracy<55){const d=meters(prev,gps);if(d>3&&d<Math.min(120,dt*20+15)&&(newSpeed>1.5||d/dt>1.5)){state.tripM+=d;save();}}
- if(!state.riding&&state.autoRide&&!state.safetyBusy&&accuracy<35 && newSpeed>5){state.moveCount++;if(state.moveCount>=3)beginRide(!state.routes.some(r=>!r.blocked),false)}else if(!state.riding)state.moveCount=0;
- dash();if(!state.riding&&state.resumeRide){const free=state.resumeMode!=='route'||!state.routes.some(r=>!r.blocked);state.resumeRide=false;beginRide(free,true);toast('Previous ride restored');}
- if(state.riding){updateProgress();applyRideOrientation();follow();}else if(!prev)follow(true);
+ if(!state.riding&&state.autoRide&&!state.safetyBusy&&accuracy<35 && newSpeed>5){state.moveCount++;if(state.moveCount>=3){
+   const route=state.routes[state.selected];const mustFree=!route||route.blocked||route.audit!=='checked';
+   beginRide(mustFree,false);if(mustFree&&route)toast('Auto Free Ride: selected road has not been verified. Stop safely to review it.',5700);
+ }}else if(!state.riding)state.moveCount=0;
+ dash();if(!state.riding&&state.resumeRide){const route=state.routes[state.selected];const free=state.resumeMode!=='route'||!route||route.blocked||route.audit!=='checked'||nearestOnRoute(route,gps).distance>90;
+ state.resumeRide=false;beginRide(free,true);toast(free?'Saved trip restored in Free Ride. Review/recalculate route before guidance.':'Ride restored • inspect GPS and battery estimate.',6500);
+ if(free&&route)state.batteryUncertain=true;
+ }
+ if(state.riding){updateProgress();proactiveBatteryCheck();applyRideOrientation();follow();}else if(!prev)follow(true);
 }
 function startGPS(){
   const seq=++state.gpsRequestId;
@@ -901,9 +968,9 @@ async function reroute(){
     // Audit before drawing a new blue line or announcing it as a usable route.
     await spotCheckWays(candidates,token);
     if(token!==state.requestId||!state.riding||state.mode!=='route')return;
-    let selected=candidates.findIndex(r=>!r.blocked);
+    let selected=candidates.findIndex(r=>!r.blocked&&r.audit==='checked');
     if(selected<0){
-      pauseUnsafeReroute('Mapped narrow, restricted, or toll roads detected on all alternatives.',candidates);
+      pauseUnsafeReroute(candidates.some(r=>r.audit==='unknown')?'Road audit unavailable. Cannot safely confirm new route. Stop and review before using turn directions.':'Mapped narrow, restricted, or toll roads detected on all alternatives.',candidates);
       return;
     }
     const picked=candidates[selected];
@@ -953,27 +1020,32 @@ function follow(force=false){if(!state.map||!state.gps)return;const now=Date.now
  if(state.riding)applyRideOrientation();else resetMapOrientation();}
 function overview(){const r=state.routes[state.selected];if(!r){follow(true);return}state.overviewUntil=Date.now()+9000;routeBounds();toast('Full route • returns to direction-up in 9 sec')}
 function bind(){
- $('destination').value=state.dest;updateStartLabel();$('battery-setting').value=Math.round(battery());$('range-setting').value=state.fullRange;$('charge-setting').value=state.fullChargeHours;$('autoride-setting').checked=state.autoRide;$('width-setting').value=state.bikeWidth;$('zoom-setting').value=state.zoom;$('pseudo3d-setting').checked=state.pseudo3d;refreshOrientationButton();applyPseudo3d();$('audio-icon').textContent=state.muted?'volume_off':'volume_up';dash();
+ $('destination').value=state.dest;updateStartLabel();$('battery-setting').value=Math.round(battery());$('range-setting').value=state.fullRange;$('charge-setting').value=state.fullChargeHours;$('reserve-setting').value=state.batteryReserve;$('autoride-setting').checked=state.autoRide;$('width-setting').value=state.bikeWidth;$('zoom-setting').value=state.zoom;$('pseudo3d-setting').checked=state.pseudo3d;refreshOrientationButton();applyPseudo3d();$('audio-icon').textContent=state.muted?'volume_off':'volume_up';dash();
  $('destination').addEventListener('input',()=>{state.searchId++;$('place-results').style.display='none';state.dest=$('destination').value;state.destPoint=null;clearRoutes(false);if(state.pin){state.map.removeLayer(state.pin);state.pin=null;}save(true)});
  $('destination').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();findRoutes()}});
  $('find-route').addEventListener('click',()=>findRoutes());$('use-current-start').addEventListener('click',useGPSStart);$('clear-start').addEventListener('click',removeSavedStart);$('voice-check').addEventListener('click',()=>voiceBatteryReport(true));
  $('clear-destination').addEventListener('click',()=>{if(state.riding)endRide();clearRoutes(true);$('place-results').style.display='none';toast('Destination cleared • Free Ride ready')});
  $('free-ride').addEventListener('click',()=>beginRide(true)); // Free Ride does not erase saved departure/destination or cached round-trip calculations.
- $('start-ride').addEventListener('click',()=>beginRide(!state.routes.length||state.routes.every(r=>r.blocked)));
+ $('start-ride').addEventListener('click',()=>{const route=state.routes[state.selected];if(route?.blocked){toast('Selected route is flagged. Choose another or tap FREE RIDE.',5600);return}beginRide(!route)});
  $('end-ride').addEventListener('click',endRide);
+ $('review-cancel').addEventListener('click',()=>{closeRouteReview();toast('Route not started. Free Ride is still available.')});
+ $('review-accept').addEventListener('click',()=>{const r=state.routes[state.selected];const expected=state.pendingRouteReview;
+ closeRouteReview();if(!r||r.blocked||routeReviewId(r)!==expected){toast('Route changed. Please review again.');return}
+ state.reviewedRouteId=expected;beginRide(false,false,true);
+ });
  $('recenter').addEventListener('click',()=>{if(!state.gps||Date.now()-state.lastLocationAt>25000)startGPS();state.overviewUntil=0;follow(true)});$('overview').addEventListener('click',overview);
  $('status').addEventListener('click',()=>{if(window.isSecureContext===false){toast('GPS needs HTTPS. Publish this HTML on Cloudflare Pages / GitHub Pages instead of opening it as a local file.',8500);return;}startGPS();toast('Requesting GPS again…',2000)});
  $('orientation-btn').addEventListener('click',()=>{state.directionUp=!state.directionUp;refreshOrientationButton();if(!state.directionUp)resetMapOrientation();else{state.overviewUntil=0;follow(true)}toast(state.directionUp?'Direction-up map enabled':'North-up map enabled');save(true)});
- $('settings-btn').addEventListener('click',()=>{$('battery-setting').value=Math.round(battery());$('charge-setting').value=state.fullChargeHours;$('direction-setting').checked=state.directionUp;$('pseudo3d-setting').checked=state.pseudo3d;$('zoom-setting').value=state.zoom;$('autoride-setting').checked=state.autoRide;$('width-setting').value=state.bikeWidth;$('settings-sheet').classList.add('open');$('settings-scroll').scrollTop=0;});$('close-settings').addEventListener('click',()=>{$('settings-sheet').classList.remove('open')});
+ $('settings-btn').addEventListener('click',()=>{$('battery-setting').value=Math.round(battery());$('charge-setting').value=state.fullChargeHours;$('reserve-setting').value=state.batteryReserve;$('direction-setting').checked=state.directionUp;$('pseudo3d-setting').checked=state.pseudo3d;$('zoom-setting').value=state.zoom;$('autoride-setting').checked=state.autoRide;$('width-setting').value=state.bikeWidth;$('confirm-battery-setting').checked=false;$('settings-sheet').classList.add('open');$('settings-scroll').scrollTop=0;});$('close-settings').addEventListener('click',()=>{$('settings-sheet').classList.remove('open')});
  $('settings-sheet').addEventListener('click',e=>{if(e.target===$('settings-sheet'))$('settings-sheet').classList.remove('open')});
  $('settings-scroll').addEventListener('focusin',e=>{if(e.target?.matches('input,select'))setTimeout(()=>e.target.scrollIntoView({block:'nearest',behavior:'instant'}),100)});
  $('audio-btn').addEventListener('click',()=>{state.muted=!state.muted;if(state.muted&&window.speechSynthesis)speechSynthesis.cancel();$('audio-icon').textContent=state.muted?'volume_off':'volume_up';save(true)});
  $('save-settings').addEventListener('click',()=>{const oldWidth=state.bikeWidth;const newBattery=clamp(Number($('battery-setting').value),0,100);
- if(Number.isFinite(newBattery)&&Math.abs(newBattery-battery())>0.75){state.batteryStart=newBattery;state.tripM=0;state.batteryUncertain=false;}
- state.fullRange=Math.max(1,+$('range-setting').value||35);state.fullChargeHours=clamp(+$('charge-setting').value||8,1,24);state.bikeWidth=Math.max(1.5,+$('width-setting').value||2.2);state.zoom=$('zoom-setting').value;state.directionUp=$('direction-setting').checked;state.pseudo3d=$('pseudo3d-setting').checked;if(!state.directionUp)resetMapOrientation();else if(state.riding){state.overviewUntil=0;follow(true);}refreshOrientationButton();applyPseudo3d();state.autoRide=$('autoride-setting').checked;const widthChanged=Math.abs(oldWidth-state.bikeWidth)>.05&&state.routes.length;if(widthChanged)clearRoutes(false);dash();save(true);$('settings-sheet').classList.remove('open');toast(widthChanged?'Width changed • Tap FIND ROUTES again':'Settings saved',widthChanged?4000:2800);});
- $('reset-trip').addEventListener('click',()=>{state.batteryStart=battery();state.tripM=0;state.batteryUncertain=false;$('battery-setting').value=state.batteryStart;dash();save(true);toast('Trip meter reset')});
+ if(Number.isFinite(newBattery)&&(Math.abs(newBattery-battery())>0.75||$('confirm-battery-setting').checked)){state.batteryStart=newBattery;state.batteryAtTripM=state.tripM;state.batteryUncertain=false;state.lastBatteryAlertLevel='';}
+ state.fullRange=Math.max(1,+$('range-setting').value||35);state.fullChargeHours=clamp(+$('charge-setting').value||8,1,24);state.batteryReserve=clamp(+$('reserve-setting').value||20,10,40);state.lastBatteryCheckAt=0;state.bikeWidth=Math.max(1.5,+$('width-setting').value||2.2);state.zoom=$('zoom-setting').value;state.directionUp=$('direction-setting').checked;state.pseudo3d=$('pseudo3d-setting').checked;if(!state.directionUp)resetMapOrientation();else if(state.riding){state.overviewUntil=0;follow(true);}refreshOrientationButton();applyPseudo3d();state.autoRide=$('autoride-setting').checked;const widthChanged=Math.abs(oldWidth-state.bikeWidth)>.05&&state.routes.length;if(widthChanged)clearRoutes(false);dash();save(true);proactiveBatteryCheck(true);$('settings-sheet').classList.remove('open');toast(widthChanged?'Width changed • Tap FIND ROUTES again':'Settings saved',widthChanged?4000:2800);});
+ $('reset-trip').addEventListener('click',()=>{state.batteryStart=battery();state.tripM=0;state.batteryAtTripM=0;state.batteryUncertain=false;$('battery-setting').value=state.batteryStart;dash();save(true);toast('Trip meter reset')});
  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')state.lastHiddenAt=Date.now();
- if(document.visibilityState==='visible'&&state.riding&&state.lastHiddenAt&&Date.now()-state.lastHiddenAt>60000){state.batteryUncertain=true;toast('Trip tracking may have paused • update actual battery for accurate estimates',5500);}
+ if(document.visibilityState==='visible'&&state.riding&&state.lastHiddenAt&&Date.now()-state.lastHiddenAt>60000){state.batteryUncertain=true;state.lastBatteryCheckAt=0;toast('GPS may have paused • Update actual battery in Settings before trusting estimates',6000);}
  save(true);if(document.visibilityState==='visible'){
     if(state.map){state.map.invalidateSize();follow(true)}
     if(!state.gps||Date.now()-state.lastLocationAt>18000)startGPS();
