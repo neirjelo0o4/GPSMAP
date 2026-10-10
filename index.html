@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#101721">
-  <meta name="description" content="Tesla-inspired local-road navigation with OpenStreetMap bicycle navigation with road-first routing.">
+  <meta name="description" content="Tesla-inspired e-bike navigation with screen wake lock, saved trip state and GPS recovery.">
   <title>E-Bike NAV V13 PRO • Smart Battery and Road Safety</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -489,7 +489,7 @@ body.riding .ui>.status:not(.gps-alert):not(.route-alert){display:none!important
 <body class="pseudo3d">
   <div id="free-map" aria-label="OpenStreetMap bicycle navigation with route choices"></div>
   <div class="ui">
-    <div class="appmark glass"><i class="mi">electric_moped</i><div>e-MOTO NAV<em>V13 PRO • FREE MAPS</em></div></div>
+    <div class="appmark glass"><i class="mi">electric_moped</i><div>e-MOTO NAV<em>V14 PRO • FREE MAPS</em></div></div>
     <div class="top-actions"><button class="round heading-on" id="orientation-btn" title="Direction up (tap for north up)" aria-label="Toggle map orientation"><i class="mi" id="orientation-icon">explore</i></button><button class="round voice-action" id="voice-check" title="Voice round-trip battery check" aria-label="Speak round-trip battery estimate"><i class="mi">record_voice_over</i></button><button class="round" id="settings-btn" title="Settings"><i class="mi">tune</i></button><button class="round" id="audio-btn" title="Mute or unmute"><i class="mi" id="audio-icon">volume_up</i></button></div>
     <section class="planning glass" id="planning">
       <div class="field-label">Starting location • saved for the return trip</div>
@@ -534,6 +534,8 @@ body.riding .ui>.status:not(.gps-alert):not(.route-alert){display:none!important
     <div class="setting"><div>Direction-up map<small>Rotates to your direction while riding; stationary = hold last heading</small></div><input type="checkbox" id="direction-setting" checked style="width:20px;height:20px;accent-color:#409bff"></div>
     <div class="setting"><div>Camera zoom<small>Tesla wide recommended</small></div><select id="zoom-setting"><option value="wide">Tesla wide</option><option value="far">Far ahead</option><option value="near">Near</option></select></div>
     <div class="setting"><div>3D-like navigation view<small>Tilted map while riding for easier look-ahead</small></div><input type="checkbox" id="pseudo3d-setting" checked style="width:20px;height:20px;accent-color:#409bff"></div>
+    <div class="setting"><div>Keep screen awake during ride<small>Chrome/Android: uses Screen Wake Lock while this page is visible. Does not provide background GPS.</small></div><input type="checkbox" id="keep-awake-setting" checked style="width:20px;height:20px;accent-color:#409bff"></div>
+    <div class="setting"><div>Display power status<small id="wake-lock-status" aria-live="polite">Only active while riding</small></div><button class="ghost" type="button" id="retry-screen-awake">RETRY</button></div>
     <div class="setting"><div>Automatic Free Ride<small>Begins after stable GPS movement</small></div><input type="checkbox" id="autoride-setting" checked style="width:20px;height:20px;accent-color:#409bff"></div>
     <div class="setting"><div>Reset trip meter</div><button class="ghost" id="reset-trip">RESET</button></div>
     <div class="setting"><div>Minimum mapped road width<small>Only where tagged in OpenStreetMap</small></div><input id="width-setting" type="number" min="1.5" max="5" step="0.1" value="2.2"></div>
@@ -561,7 +563,7 @@ const state={
   routes:prior.route&&Array.isArray(prior.route.points)?[{...prior.route,audit:'unknown',blocked:false}]:[],routeReady:!!prior.route,
   resumeRide:!!prior.riding && (Date.now()-(prior.savedAt||0)<3600000),resumeMode:prior.mode||'free',
   dest:prior.dest||'',destPoint:prior.destPoint||null,requestId:0,searchId:0,
-  riding:false,mode:'free',autoRide:prior.autoRide!==false,muted:!!prior.muted,
+  riding:false,mode:'free',autoRide:prior.autoRide!==false,keepAwake:prior.keepAwake!==false,muted:!!prior.muted,
   batteryStart:clamp(Number.isFinite(+prior.batteryStart)?+prior.batteryStart:100,0,100),batteryAtTripM:Math.max(0,Number.isFinite(+prior.batteryAtTripM)?+prior.batteryAtTripM:0),
   fullRange:Math.max(1,+prior.fullRange||35),tripM:Math.max(0,+prior.tripM||0),
   bikeWidth:Math.max(1.5,+prior.bikeWidth||2.2),zoom:prior.zoomStyle||'wide',directionUp:prior.directionUp!==false,pseudo3d:prior.pseudo3d!==false,
@@ -592,12 +594,86 @@ function gpsStatus(accuracy){
   else status(`GPS ready • ±${Math.round(accuracy)} m`);
 }
 function speak(text,urgent=false){if(state.muted||!text||!window.speechSynthesis)return;try{if(urgent)speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='en-PH';u.rate=1.02;speechSynthesis.speak(u)}catch(_){}}
+// Keep the screen on only during a visible active ride. Screen Wake Lock is
+// automatically released by the browser when the tab becomes hidden or OS locks.
+let activeScreenWakeLock=null;
+let wakeRequestPromise=null;
+let wakeRetryTimer=null;
+let lastWakeRetryAt=0;
+let lastWakeWarningAt=0;
+function screenWakeEligible(){
+ return !!(state.riding&&state.keepAwake&&document.visibilityState==='visible');
+}
+function wakeStatusText(msg){const el=$('wake-lock-status');if(el)el.textContent=msg;}
+function wakeWarning(msg){
+ wakeStatusText(msg);
+ if(Date.now()-lastWakeWarningAt>45000){lastWakeWarningAt=Date.now();toast(msg,5500);}
+}
+function releaseScreenWakeLock(){
+ if(wakeRetryTimer){clearTimeout(wakeRetryTimer);wakeRetryTimer=null;}
+ const lock=activeScreenWakeLock;activeScreenWakeLock=null;
+ if(lock){try{Promise.resolve(lock.release()).catch(()=>{});}catch(_){}}
+ wakeStatusText(state.riding?'Paused (screen may lock when app is hidden)':'Standby — activates with START RIDE');
+}
+function requestScreenWakeLock(force=false){
+ if(!screenWakeEligible()){
+   if(activeScreenWakeLock)releaseScreenWakeLock();
+   else wakeStatusText(state.riding?'Paused — return to this app to keep screen on':'Standby — activates with START RIDE');
+   return;
+ }
+ if(activeScreenWakeLock&&!activeScreenWakeLock.released){wakeStatusText('ACTIVE — screen kept on while this app is visible');return;}
+ if(wakeRequestPromise)return;
+ if(!window.isSecureContext){wakeWarning('Screen Wake Lock requires HTTPS or localhost.');return;}
+ if(!('wakeLock' in navigator)||typeof navigator.wakeLock?.request!=='function'){
+   wakeWarning('Screen Wake Lock is not supported by this browser. Try updated Chrome over HTTPS.');return;
+ }
+ if(!force&&Date.now()-lastWakeRetryAt<6000)return;
+ lastWakeRetryAt=Date.now();
+ wakeStatusText('Requesting screen wake lock...');
+ wakeRequestPromise=Promise.resolve().then(()=>navigator.wakeLock.request('screen'));
+ wakeRequestPromise.then(lock=>{
+   wakeRequestPromise=null;
+   if(!screenWakeEligible()){
+     try{Promise.resolve(lock.release()).catch(()=>{});}catch(_){}
+     wakeStatusText('Paused — app not visible or ride stopped');
+     return;
+   }
+   activeScreenWakeLock=lock;
+   wakeStatusText('ACTIVE — screen stays on while this app is visible');
+   lock.addEventListener?.('release',()=>{
+     if(activeScreenWakeLock===lock)activeScreenWakeLock=null;
+     if(screenWakeEligible()){
+       wakeStatusText('Screen wake lock released — retrying');
+       if(wakeRetryTimer)clearTimeout(wakeRetryTimer);
+       wakeRetryTimer=setTimeout(()=>{wakeRetryTimer=null;requestScreenWakeLock();},7000);
+     }else wakeStatusText('Paused — app in background or ride ended');
+   },{once:true});
+ }).catch(err=>{
+   wakeRequestPromise=null;
+   wakeWarning('Unable to keep screen awake. Check battery saver, HTTPS, and Chrome permissions.');
+   console.warn('Screen wake lock denied:',err?.name||err);
+ });
+}
+function checkForegroundGpsRecovery(){
+ if(document.visibilityState!=='visible')return;
+ if(state.riding&&(!state.lastLocationAt||Date.now()-state.lastLocationAt>45000)){
+   if(state.speedKph>2)state.batteryUncertain=true;
+   state.speedKph=0;dash();
+   // Refresh the geolocation watcher only while the app is visible.
+   if(Date.now()-lastVisibleGpsRetryAt>30000){
+     lastVisibleGpsRetryAt=Date.now();
+     status('GPS stale — reconnecting...',true);
+     startGPS();
+   }
+ }
+}
+let lastVisibleGpsRetryAt=0;
 function save(force=false){const now=Date.now();if(!force&&now-state.lastSave<7000)return;state.lastSave=now;
  try{const route=state.routes[state.selected];localStorage.setItem(STORAGE,JSON.stringify({dest:state.dest,destPoint:state.destPoint,startPoint:state.startPoint,startSavedAt:state.startSavedAt,
  returnMeters:state.returnMeters,returnKey:state.returnKey,fullChargeHours:state.fullChargeHours,batteryReserve:state.batteryReserve,
  batteryUncertain:state.batteryUncertain,lastHiddenAt:state.lastHiddenAt,
  route:route?{...route,points:route.points.map(p=>({lat:+p.lat.toFixed(5),lng:+p.lng.toFixed(5)}))}:null,
- batteryStart:state.batteryStart,batteryAtTripM:state.batteryAtTripM,fullRange:state.fullRange,tripM:state.tripM,autoRide:state.autoRide,muted:state.muted,zoomStyle:state.zoom,bikeWidth:state.bikeWidth,directionUp:state.directionUp,pseudo3d:state.pseudo3d,riding:state.riding,mode:state.mode,savedAt:Date.now()}));}catch(_){}}
+ batteryStart:state.batteryStart,batteryAtTripM:state.batteryAtTripM,fullRange:state.fullRange,tripM:state.tripM,autoRide:state.autoRide,keepAwake:state.keepAwake,muted:state.muted,zoomStyle:state.zoom,bikeWidth:state.bikeWidth,directionUp:state.directionUp,pseudo3d:state.pseudo3d,riding:state.riding,mode:state.mode,savedAt:Date.now()}));}catch(_){}}
 function dash(){const b=battery();$('speed').textContent=Math.round(state.speedKph);$('battery').textContent=`${Math.round(b)}%`;$('range').textContent=`${num(b/100*state.fullRange)} km`;$('trip').textContent=`${num(state.tripM/1000)} km`;}
 function initMap(){state.map=L.map('free-map',{zoomControl:false,preferCanvas:true,zoomSnap:.25,zoomDelta:.5,rotate:true,bearing:0,touchRotate:false,dragRotate:false,rotateControl:false}).setView([14.6,121.17],15.5);
  if(typeof state.map.setBearing==='function')state.map.on('rotate',syncArrowOrientation);
@@ -846,11 +922,12 @@ function beginRide(forceFree=false,silent=false,reviewed=false){
  clearRouteAlert();
  state.mode=!forceFree&&state.routes[state.selected]&&!state.routes[state.selected].blocked?'route':'free';state.riding=true;state.moveCount=0;state.prevGps=state.gps;state.nextTurn=0;state.voiceMarks.clear();state.offRouteCount=0;state.overviewUntil=0;
  document.body.classList.add('riding');
+ requestScreenWakeLock(true); // Screen stays awake while this ride is visible.
  if(state.mode==='free'){for(const layer of state.layers){try{state.map.removeLayer(layer)}catch(_){}}state.layers=[];} // Preserve route for range analysis without drawing it during Free Ride.
  refreshOrientationButton();if(state.directionUp&&typeof state.map.setBearing!=='function')toast('Direction-up unavailable. Check internet; map will stay north-up.',5000);$('nav-label').textContent=state.mode==='route'?'NEXT TURN':'FREE RIDE';$('turn-heading').textContent=state.mode==='route'?'Follow your route':'Free Ride';$('turn-road').textContent=state.mode==='route'?'Voice guidance active':'No destination • GPS tracking';$('turn-icon').textContent='navigation';
  if(!silent)speak(state.mode==='route'?'Bike road-first navigation started. Verify road width, signs and access before following.':'Free ride started.');follow(true);updateProgress();save(true);
 }
-function endRide(){if(!state.riding)return;if(state.routingBusy){state.requestId++;state.returnCheckSeq++;state.routingBusy=false;state.safetyBusy=false;}state.riding=false;state.mode='free';document.body.classList.remove('riding');state.moveCount=0;clearRouteAlert();if(state.gps)gpsStatus(state.lastAccuracy);resetMapOrientation();if(state.routes.length)redrawRoutes();speak('Ride ended.',true);save(true);follow(true)}
+function endRide(){if(!state.riding)return;if(state.routingBusy){state.requestId++;state.returnCheckSeq++;state.routingBusy=false;state.safetyBusy=false;}state.riding=false;state.mode='free';document.body.classList.remove('riding');releaseScreenWakeLock();state.moveCount=0;clearRouteAlert();if(state.gps)gpsStatus(state.lastAccuracy);resetMapOrientation();if(state.routes.length)redrawRoutes();speak('Ride ended.',true);save(true);follow(true)}
 function onGPS(position){const c=position.coords;const gps={lat:c.latitude,lng:c.longitude},now=Date.now(),accuracy=c.accuracy||999;
  // Do not silently discard a coarse first fix: show signal quality, and wait for a precise fix.
  if(!Number.isFinite(gps.lat)||!Number.isFinite(gps.lng))return;
@@ -1020,7 +1097,7 @@ function follow(force=false){if(!state.map||!state.gps)return;const now=Date.now
  if(state.riding)applyRideOrientation();else resetMapOrientation();}
 function overview(){const r=state.routes[state.selected];if(!r){follow(true);return}state.overviewUntil=Date.now()+9000;routeBounds();toast('Full route • returns to direction-up in 9 sec')}
 function bind(){
- $('destination').value=state.dest;updateStartLabel();$('battery-setting').value=Math.round(battery());$('range-setting').value=state.fullRange;$('charge-setting').value=state.fullChargeHours;$('reserve-setting').value=state.batteryReserve;$('autoride-setting').checked=state.autoRide;$('width-setting').value=state.bikeWidth;$('zoom-setting').value=state.zoom;$('pseudo3d-setting').checked=state.pseudo3d;refreshOrientationButton();applyPseudo3d();$('audio-icon').textContent=state.muted?'volume_off':'volume_up';dash();
+ $('destination').value=state.dest;updateStartLabel();$('battery-setting').value=Math.round(battery());$('range-setting').value=state.fullRange;$('charge-setting').value=state.fullChargeHours;$('reserve-setting').value=state.batteryReserve;$('autoride-setting').checked=state.autoRide;$('keep-awake-setting').checked=state.keepAwake;wakeStatusText('Standby — activates with START RIDE');$('width-setting').value=state.bikeWidth;$('zoom-setting').value=state.zoom;$('pseudo3d-setting').checked=state.pseudo3d;refreshOrientationButton();applyPseudo3d();$('audio-icon').textContent=state.muted?'volume_off':'volume_up';dash();
  $('destination').addEventListener('input',()=>{state.searchId++;$('place-results').style.display='none';state.dest=$('destination').value;state.destPoint=null;clearRoutes(false);if(state.pin){state.map.removeLayer(state.pin);state.pin=null;}save(true)});
  $('destination').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();findRoutes()}});
  $('find-route').addEventListener('click',()=>findRoutes());$('use-current-start').addEventListener('click',useGPSStart);$('clear-start').addEventListener('click',removeSavedStart);$('voice-check').addEventListener('click',()=>voiceBatteryReport(true));
@@ -1036,20 +1113,41 @@ function bind(){
  $('recenter').addEventListener('click',()=>{if(!state.gps||Date.now()-state.lastLocationAt>25000)startGPS();state.overviewUntil=0;follow(true)});$('overview').addEventListener('click',overview);
  $('status').addEventListener('click',()=>{if(window.isSecureContext===false){toast('GPS needs HTTPS. Publish this HTML on Cloudflare Pages / GitHub Pages instead of opening it as a local file.',8500);return;}startGPS();toast('Requesting GPS again…',2000)});
  $('orientation-btn').addEventListener('click',()=>{state.directionUp=!state.directionUp;refreshOrientationButton();if(!state.directionUp)resetMapOrientation();else{state.overviewUntil=0;follow(true)}toast(state.directionUp?'Direction-up map enabled':'North-up map enabled');save(true)});
- $('settings-btn').addEventListener('click',()=>{$('battery-setting').value=Math.round(battery());$('charge-setting').value=state.fullChargeHours;$('reserve-setting').value=state.batteryReserve;$('direction-setting').checked=state.directionUp;$('pseudo3d-setting').checked=state.pseudo3d;$('zoom-setting').value=state.zoom;$('autoride-setting').checked=state.autoRide;$('width-setting').value=state.bikeWidth;$('confirm-battery-setting').checked=false;$('settings-sheet').classList.add('open');$('settings-scroll').scrollTop=0;});$('close-settings').addEventListener('click',()=>{$('settings-sheet').classList.remove('open')});
+ $('settings-btn').addEventListener('click',()=>{$('battery-setting').value=Math.round(battery());$('charge-setting').value=state.fullChargeHours;$('reserve-setting').value=state.batteryReserve;$('direction-setting').checked=state.directionUp;$('pseudo3d-setting').checked=state.pseudo3d;$('zoom-setting').value=state.zoom;$('autoride-setting').checked=state.autoRide;$('keep-awake-setting').checked=state.keepAwake;$('width-setting').value=state.bikeWidth;$('confirm-battery-setting').checked=false;$('settings-sheet').classList.add('open');$('settings-scroll').scrollTop=0;});$('close-settings').addEventListener('click',()=>{$('settings-sheet').classList.remove('open')});
  $('settings-sheet').addEventListener('click',e=>{if(e.target===$('settings-sheet'))$('settings-sheet').classList.remove('open')});
  $('settings-scroll').addEventListener('focusin',e=>{if(e.target?.matches('input,select'))setTimeout(()=>e.target.scrollIntoView({block:'nearest',behavior:'instant'}),100)});
  $('audio-btn').addEventListener('click',()=>{state.muted=!state.muted;if(state.muted&&window.speechSynthesis)speechSynthesis.cancel();$('audio-icon').textContent=state.muted?'volume_off':'volume_up';save(true)});
  $('save-settings').addEventListener('click',()=>{const oldWidth=state.bikeWidth;const newBattery=clamp(Number($('battery-setting').value),0,100);
  if(Number.isFinite(newBattery)&&(Math.abs(newBattery-battery())>0.75||$('confirm-battery-setting').checked)){state.batteryStart=newBattery;state.batteryAtTripM=state.tripM;state.batteryUncertain=false;state.lastBatteryAlertLevel='';}
- state.fullRange=Math.max(1,+$('range-setting').value||35);state.fullChargeHours=clamp(+$('charge-setting').value||8,1,24);state.batteryReserve=clamp(+$('reserve-setting').value||20,10,40);state.lastBatteryCheckAt=0;state.bikeWidth=Math.max(1.5,+$('width-setting').value||2.2);state.zoom=$('zoom-setting').value;state.directionUp=$('direction-setting').checked;state.pseudo3d=$('pseudo3d-setting').checked;if(!state.directionUp)resetMapOrientation();else if(state.riding){state.overviewUntil=0;follow(true);}refreshOrientationButton();applyPseudo3d();state.autoRide=$('autoride-setting').checked;const widthChanged=Math.abs(oldWidth-state.bikeWidth)>.05&&state.routes.length;if(widthChanged)clearRoutes(false);dash();save(true);proactiveBatteryCheck(true);$('settings-sheet').classList.remove('open');toast(widthChanged?'Width changed • Tap FIND ROUTES again':'Settings saved',widthChanged?4000:2800);});
+ state.fullRange=Math.max(1,+$('range-setting').value||35);state.fullChargeHours=clamp(+$('charge-setting').value||8,1,24);state.batteryReserve=clamp(+$('reserve-setting').value||20,10,40);state.lastBatteryCheckAt=0;state.bikeWidth=Math.max(1.5,+$('width-setting').value||2.2);state.zoom=$('zoom-setting').value;state.directionUp=$('direction-setting').checked;state.pseudo3d=$('pseudo3d-setting').checked;if(!state.directionUp)resetMapOrientation();else if(state.riding){state.overviewUntil=0;follow(true);}refreshOrientationButton();applyPseudo3d();state.autoRide=$('autoride-setting').checked;state.keepAwake=$('keep-awake-setting').checked;if(state.keepAwake)requestScreenWakeLock(true);else releaseScreenWakeLock();const widthChanged=Math.abs(oldWidth-state.bikeWidth)>.05&&state.routes.length;if(widthChanged)clearRoutes(false);dash();save(true);proactiveBatteryCheck(true);$('settings-sheet').classList.remove('open');toast(widthChanged?'Width changed • Tap FIND ROUTES again':'Settings saved',widthChanged?4000:2800);});
+ $('retry-screen-awake').addEventListener('click',()=>{if(!state.riding){toast('Start a ride first to enable screen wake lock.');return;}requestScreenWakeLock(true);});
  $('reset-trip').addEventListener('click',()=>{state.batteryStart=battery();state.tripM=0;state.batteryAtTripM=0;state.batteryUncertain=false;$('battery-setting').value=state.batteryStart;dash();save(true);toast('Trip meter reset')});
- document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')state.lastHiddenAt=Date.now();
- if(document.visibilityState==='visible'&&state.riding&&state.lastHiddenAt&&Date.now()-state.lastHiddenAt>60000){state.batteryUncertain=true;state.lastBatteryCheckAt=0;toast('GPS may have paused • Update actual battery in Settings before trusting estimates',6000);}
- save(true);if(document.visibilityState==='visible'){
-    if(state.map){state.map.invalidateSize();follow(true)}
-    if(!state.gps||Date.now()-state.lastLocationAt>18000)startGPS();
-  }else if(typeof state.map?.stopHeadingUp==='function')state.map.stopHeadingUp()});window.addEventListener('pagehide',()=>{state.lastHiddenAt=Date.now();save(true)});
+ document.addEventListener('visibilitychange',()=>{
+ const hidden=document.visibilityState==='hidden';
+ if(hidden){state.lastHiddenAt=Date.now();releaseScreenWakeLock();}
+ else{
+   if(state.riding&&state.lastHiddenAt&&Date.now()-state.lastHiddenAt>30000){
+     state.batteryUncertain=true;state.lastBatteryCheckAt=0;
+     toast('Returned to ride • background GPS may have paused. Confirm actual battery before relying on return estimates.',7000);
+   }
+   if(state.map){state.map.invalidateSize();follow(true)}
+   if(!state.gps||Date.now()-state.lastLocationAt>18000)startGPS();
+   if(state.riding)requestScreenWakeLock(true);
+ }
+ save(true);
+ if(hidden&&typeof state.map?.stopHeadingUp==='function')state.map.stopHeadingUp();
+ });
+ window.addEventListener('pagehide',()=>{state.lastHiddenAt=Date.now();releaseScreenWakeLock();save(true)});
+ window.addEventListener('pageshow',e=>{
+   if(!e.persisted||document.visibilityState!=='visible')return;
+   if(state.riding){requestScreenWakeLock(true);checkForegroundGpsRecovery();}
+ });
+ // Background timers and browser GPS may pause; do not claim distance was tracked while hidden.
+ window.setInterval(()=>{if(state.riding&&document.visibilityState==='visible'){
+   if(state.keepAwake&&!activeScreenWakeLock)requestScreenWakeLock();
+   checkForegroundGpsRecovery();
+ }},15000);
+
 }
 // GPS must start even if the optional map rotation extension / tile CDN fails.
 try{initMap()}catch(err){console.error('Map startup failed:',err);status('Map failed to load • Check internet and reload',true)}
